@@ -4,6 +4,7 @@ dns.setServers(["8.8.8.8", "8.8.4.4"]);
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const managementRoutes = require("./routes/managementRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -11,6 +12,7 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use("/api/management", managementRoutes);
 
 // Test route
 app.get("/", (req, res) => {
