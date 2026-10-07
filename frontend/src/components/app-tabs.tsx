@@ -27,6 +27,24 @@ export default function AppTabs() {
           renderingMode="template"
         />
       </NativeTabs.Trigger>
+
+      {/* WF-09: Reading Room search + seat booking workflow */}
+      <NativeTabs.Trigger name="reading-rooms">
+        <NativeTabs.Trigger.Label>Reading Rooms</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="book.closed" md="menu_book" />
+      </NativeTabs.Trigger>
+
+      {/* WF-13: the student's seat reservations */}
+      <NativeTabs.Trigger name="reservations">
+        <NativeTabs.Trigger.Label>Reservations</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="calendar" md="calendar_month" />
+      </NativeTabs.Trigger>
+
+      {/* WF-15: local in-app notifications */}
+      <NativeTabs.Trigger name="notifications">
+        <NativeTabs.Trigger.Label>Notifications</NativeTabs.Trigger.Label>
+        <NativeTabs.Trigger.Icon sf="bell" md="notifications" />
+      </NativeTabs.Trigger>
     </NativeTabs>
   );
 }

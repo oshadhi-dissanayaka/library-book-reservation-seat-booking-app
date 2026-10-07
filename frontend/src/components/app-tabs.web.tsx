@@ -27,6 +27,15 @@ export default function AppTabs() {
           <TabTrigger name="explore" href="/explore" asChild>
             <TabButton>Explore</TabButton>
           </TabTrigger>
+          <TabTrigger name="reading-rooms" href="/reading-rooms" asChild>
+            <TabButton>Reading Rooms</TabButton>
+          </TabTrigger>
+          <TabTrigger name="reservations" href="/reservations" asChild>
+            <TabButton>Reservations</TabButton>
+          </TabTrigger>
+          <TabTrigger name="notifications" href="/notifications" asChild>
+            <TabButton>Notifications</TabButton>
+          </TabTrigger>
         </CustomTabList>
       </TabList>
     </Tabs>
@@ -89,6 +98,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.five,
     borderRadius: Spacing.five,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     flexGrow: 1,
     gap: Spacing.two,
