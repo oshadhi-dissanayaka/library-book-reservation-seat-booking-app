@@ -5,6 +5,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const managementRoutes = require("./routes/managementRoutes");
+const staffRoutes = require("./routes/staffRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -13,6 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/api/management", managementRoutes);
+app.use("/api/staff", staffRoutes);
 
 // Test route
 app.get("/", (req, res) => {
