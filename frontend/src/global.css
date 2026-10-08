@@ -7,3 +7,9 @@
   --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
   --font-serif: Georgia, 'Times New Roman', serif;
 }
+
+input[aria-label='Search by title, author, ISBN, or call number']:focus {
+  outline: 1px solid #cbd2dc !important;
+  outline-offset: 1px;
+  box-shadow: 0 0 0 3px rgb(102 115 138 / 8%) !important;
+}

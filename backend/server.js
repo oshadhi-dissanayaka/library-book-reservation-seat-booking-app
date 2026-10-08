@@ -5,6 +5,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const managementRoutes = require("./routes/managementRoutes");
+const bookRoutes = require("./routes/bookRoutes");
+const reservationRoutes = require("./routes/reservationRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -13,6 +15,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/api/management", managementRoutes);
+app.use("/api/books", bookRoutes);
+app.use("/api/reservations", reservationRoutes);
 
 // Test route
 app.get("/", (req, res) => {
@@ -32,7 +36,7 @@ mongoose
   });
 
 // Server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
