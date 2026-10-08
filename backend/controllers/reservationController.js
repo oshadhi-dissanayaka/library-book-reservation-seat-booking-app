@@ -1,212 +1,178 @@
-const crypto = require("crypto");
+// ============================================================
+// Reservation controller (WF-11 Seat Reservation)
+// IT3060 HCI Milestone 03
+//
+// Endpoints:
+//   POST /api/reservations  -> create a seat reservation
+//   GET  /api/reservations  -> list demo-student reservations
+//                              (optional filters: readingRoom,
+//                               date, time — used by WF-10 to
+//                               know which seats are taken)
+// ============================================================
+
 const mongoose = require("mongoose");
-const Book = require("../models/Book");
-const Reservation = require("../models/Reservation");
-const { releaseExpiredBookHolds } = require("../services/bookHoldService");
+const Reservation = require("../models/SeatReservation");
+const ReadingRoom = require("../models/ReadingRoom");
 
-const normalizePatronId = (value) => String(value || "").trim().toUpperCase();
+// Shown whenever a seat is already taken
+const SEAT_TAKEN_MESSAGE = "This seat is no longer available. Please select another seat.";
+const BLOCK_MINUTES = 120;
 
-const parsePickupDate = (value) => {
-  const dateOnly = String(value || "").slice(0, 10);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return null;
+function toMinutesSinceMidnight(value) {
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
 
-  const date = new Date(`${dateOnly}T00:00:00.000Z`);
-  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== dateOnly) return null;
+function formatBlockEdge(totalMinutes) {
+  const hour = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  const period = hour >= 12 ? "PM" : "AM";
+  return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+}
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-  const latest = new Date(today);
-  latest.setUTCDate(latest.getUTCDate() + 6);
+function validTimeBlocksFor(room) {
+  const open = toMinutesSinceMidnight(room.openingTime);
+  const close = toMinutesSinceMidnight(room.closingTime);
+  const blocks = [];
 
-  if (date < today || date > latest) return null;
-  return date;
-};
-
-const parsePickupTime = (value) => {
-  const time = String(value || "").trim();
-  if (!/^([01]?\d|2[0-3]):[0-5]\d$/.test(time)) return null;
-  const [hours, minutes] = time.split(":").map(Number);
-  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null;
-  return time;
-};
-
-const getReservations = async (req, res) => {
-  const patronId = normalizePatronId(req.query.patronId);
-  if (patronId.length < 3 || patronId.length > 40) {
-    return res.status(400).json({ message: "Enter a valid student or patron ID." });
+  for (let from = open; from + BLOCK_MINUTES <= close; from += BLOCK_MINUTES) {
+    blocks.push(`${formatBlockEdge(from)} – ${formatBlockEdge(from + BLOCK_MINUTES)}`);
   }
 
-  try {
-    await releaseExpiredBookHolds({ patronId });
-    const items = await Reservation.find({ patronId, resourceType: "book" })
-      .populate("bookId", "title author isbn category library shelf callNumber coverImage")
-      .sort({ createdAt: -1 })
-      .lean();
-    return res.json({ items });
-  } catch (error) {
-    return res.status(500).json({ message: "Unable to load reservations." });
-  }
-};
+  return blocks;
+}
 
+// ------------------------------------------------------------
+// POST /api/reservations
+// Body: { readingRoom, date, time, seatNumber }
+// ------------------------------------------------------------
 const createReservation = async (req, res) => {
-  const patronId = normalizePatronId(req.body.patronId);
-  const { bookId } = req.body;
-  const pickupDate = parsePickupDate(req.body.pickupDate);
-  const pickupTime = parsePickupTime(req.body.pickupTime);
-  const pickupLocation = String(req.body.pickupLocation || "").trim();
-
-  if (patronId.length < 3 || patronId.length > 40) {
-    return res.status(400).json({ message: "Enter a valid student or patron ID." });
-  }
-  if (!mongoose.isValidObjectId(bookId)) {
-    return res.status(400).json({ message: "Select a valid catalog book." });
-  }
-  if (!pickupDate) {
-    return res.status(400).json({ message: "Choose a pickup date within the next seven days." });
-  }
-  if (!pickupTime) {
-    return res.status(400).json({ message: "Choose a pickup time in HH:MM format." });
-  }
-  if (pickupLocation.length < 3 || pickupLocation.length > 120) {
-    return res.status(400).json({ message: "Choose or enter a valid pickup library or desk." });
-  }
-  if (req.body.termsAccepted !== true) {
-    return res.status(400).json({ message: "Accept the reservation terms to continue." });
-  }
-
   try {
-    await releaseExpiredBookHolds({ bookId });
-    const book = await Book.findById(bookId);
-    if (!book) return res.status(404).json({ message: "Book not found in the catalog." });
+    const { readingRoom, date, time, seatNumber } = req.body;
 
-    const duplicate = await Reservation.exists({
-      resourceType: "book",
-      bookId,
-      patronId,
-      status: "confirmed",
-    });
-    if (duplicate) {
-      return res.status(409).json({ message: "You already have an active reservation for this book." });
+    // --- basic validation (clear, beginner-friendly checks) ---
+    if (!readingRoom || typeof readingRoom !== "string") {
+      return res.status(400).json({ message: "Reading room id is required" });
+    }
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      return res.status(400).json({ message: "Date must be in YYYY-MM-DD format" });
+    }
+    if (!time || typeof time !== "string" || time.trim() === "") {
+      return res.status(400).json({ message: "Time is required" });
+    }
+    if (!Number.isInteger(seatNumber) || seatNumber < 1) {
+      return res.status(400).json({ message: "Seat number must be a positive integer" });
+    }
+    if (!mongoose.isValidObjectId(readingRoom)) {
+      return res.status(400).json({ message: "Invalid reading room id" });
     }
 
-    const availableBook = await Book.findOneAndUpdate(
-      { _id: bookId, availableCopies: { $gt: 0 } },
-      { $inc: { availableCopies: -1 } },
-      { returnDocument: "after" }
-    );
-    if (!availableBook) {
-      return res.status(409).json({ message: "This book is currently unavailable." });
+    // --- the room must exist ---
+    const room = await ReadingRoom.findById(readingRoom);
+    if (!room) {
+      return res.status(404).json({ message: "Reading room not found" });
     }
 
-    try {
-      const reservation = await Reservation.create({
-        reservationId: `RB-${crypto.randomBytes(6).toString("hex").toUpperCase()}`,
-        resourceType: "book",
-        patronId,
-        bookId: availableBook._id,
-        pickupDate,
-        pickupTime,
-        pickupLocation,
-        holdExpiresAt: new Date(pickupDate.getTime() + 48 * 60 * 60 * 1000),
-        activeBookKey: `${availableBook._id}:${patronId}`,
+    // Accept only the same complete, opening-time-aligned 2-hour blocks that
+    // WF-10 generates. Any remainder before closing is intentionally not
+    // bookable (for 08:00–18:30, the final valid block ends at 18:00).
+    const normalizedTime = time.trim();
+    if (!validTimeBlocksFor(room).includes(normalizedTime)) {
+      return res.status(400).json({
+        message: "Time must be a valid complete 2-hour block within reading room hours",
       });
-      const populated = await Reservation.findById(reservation._id)
-        .populate("bookId", "title author isbn category library shelf callNumber coverImage")
-        .lean();
-      return res.status(201).json(populated);
-    } catch (error) {
-      await Book.updateOne({ _id: availableBook._id }, { $inc: { availableCopies: 1 } });
-      if (error.code === 11000 && error.keyPattern?.activeBookKey) {
-        return res.status(409).json({ message: "You already have an active reservation for this book." });
-      }
-      if (error.code === 11000 && error.keyPattern?.reservationId) {
-        return res.status(409).json({ message: "A reservation ID conflict occurred. Please try again." });
-      }
-      if (error.name === "ValidationError") {
-        return res.status(400).json({ message: error.message });
-      }
-      return res.status(500).json({ message: "Unable to create this reservation." });
     }
+
+    // --- reject a seat that is already held (friendly pre-check) ---
+    const existing = await Reservation.findOne({
+      readingRoom,
+      date,
+      time: normalizedTime,
+      seatNumber,
+      status: "active",
+    });
+    if (existing) {
+      return res.status(409).json({ message: SEAT_TAKEN_MESSAGE });
+    }
+
+    // --- create the reservation ---
+    const reservation = await Reservation.create({
+      readingRoom,
+      date,
+      time: normalizedTime,
+      seatNumber,
+      status: "active",
+      studentId: "demo-student",
+    });
+
+    // Simple reference code for the confirmation screen (WF-12)
+    const confirmationCode = `RES-SEAT-${String(reservation._id).slice(-4).toUpperCase()}`;
+
+    return res.status(201).json({
+      message: "Reservation created successfully",
+      _id: reservation._id,
+      readingRoom: reservation.readingRoom,
+      date: reservation.date,
+      time: reservation.time,
+      seatNumber: reservation.seatNumber,
+      status: reservation.status,
+      studentId: reservation.studentId,
+      createdAt: reservation.createdAt,
+      confirmationCode,
+      confirmationNote: "Please arrive within 15 minutes of your scheduled time.",
+    });
   } catch (error) {
-    return res.status(500).json({ message: "Unable to create this reservation." });
+    // Duplicate key (race condition) -> seat was taken at the exact moment
+    if (error && error.code === 11000) {
+      return res.status(409).json({ message: SEAT_TAKEN_MESSAGE });
+    }
+    if (error && error.name === "ValidationError") {
+      const firstMessage = Object.values(error.errors)[0].message;
+      return res.status(400).json({ message: firstMessage });
+    }
+    console.error("Error creating reservation:", error);
+    return res.status(500).json({ message: "Could not save the reservation. Please try again." });
   }
 };
 
-const updateReservation = async (req, res) => {
-  const patronId = normalizePatronId(req.body.patronId);
-  const pickupDate = parsePickupDate(req.body.pickupDate);
-  const pickupTime = parsePickupTime(req.body.pickupTime);
-  if (!mongoose.isValidObjectId(req.params.id)) {
-    return res.status(400).json({ message: "Invalid reservation ID." });
-  }
-  if (patronId.length < 3 || patronId.length > 40 || !pickupDate) {
-    return res.status(400).json({ message: "Enter your ID and choose a pickup date within seven days." });
-  }
-  if (pickupTime === null) {
-    return res.status(400).json({ message: "Choose a pickup time in HH:MM format." });
-  }
-
+// ------------------------------------------------------------
+// GET /api/reservations
+// Optional query filters: ?readingRoom=...&date=YYYY-MM-DD&time=10:00 AM
+// For now every reservation belongs to the demo student.
+// ------------------------------------------------------------
+const getReservations = async (req, res) => {
   try {
-    await releaseExpiredBookHolds({ patronId });
-    const reservation = await Reservation.findOneAndUpdate(
-      { _id: req.params.id, patronId, resourceType: "book", status: "confirmed" },
-      {
-        $set: {
-          pickupDate,
-          pickupTime,
-          holdExpiresAt: new Date(pickupDate.getTime() + 48 * 60 * 60 * 1000),
-        },
-      },
-      { returnDocument: "after", runValidators: true }
-    )
-      .populate("bookId", "title author isbn category library shelf callNumber coverImage")
-      .lean();
+    const { readingRoom, date, time } = req.query;
 
-    if (!reservation) {
-      return res.status(404).json({ message: "Active reservation not found for this ID." });
+    const filter = { studentId: "demo-student" };
+
+    if (readingRoom) {
+      if (!mongoose.isValidObjectId(readingRoom)) {
+        return res.status(400).json({ message: "Invalid reading room id" });
+      }
+      filter.readingRoom = readingRoom;
     }
-    return res.json(reservation);
-  } catch (error) {
-    return res.status(500).json({ message: "Unable to update this reservation." });
-  }
-};
-
-const cancelReservation = async (req, res) => {
-  const patronId = normalizePatronId(req.query.patronId || req.body.patronId);
-  if (!mongoose.isValidObjectId(req.params.id)) {
-    return res.status(400).json({ message: "Invalid reservation ID." });
-  }
-  if (patronId.length < 3 || patronId.length > 40) {
-    return res.status(400).json({ message: "Enter a valid student or patron ID." });
-  }
-
-  try {
-    await releaseExpiredBookHolds({ patronId });
-    const reservation = await Reservation.findOneAndUpdate(
-      {
-        _id: req.params.id,
-        patronId,
-        resourceType: "book",
-        status: "confirmed",
-      },
-      { $set: { status: "cancelled" }, $unset: { activeBookKey: 1 } },
-      { returnDocument: "after" }
-    );
-
-    if (!reservation) {
-      return res.status(404).json({ message: "Active reservation not found for this ID." });
+    if (date) {
+      filter.date = date;
+    }
+    if (time) {
+      filter.time = time;
     }
 
-    await Book.updateOne({ _id: reservation.bookId }, { $inc: { availableCopies: 1 } });
-    return res.json({ message: "Reservation cancelled.", reservationId: reservation._id });
+    const reservations = await Reservation.find(filter).sort({ createdAt: -1 });
+
+    return res.status(200).json({
+      count: reservations.length,
+      reservations,
+    });
   } catch (error) {
-    return res.status(500).json({ message: "Unable to cancel this reservation." });
+    console.error("Error fetching reservations:", error);
+    return res.status(500).json({ message: "Could not load reservations. Please try again." });
   }
 };
 
 module.exports = {
-  getReservations,
   createReservation,
-  updateReservation,
-  cancelReservation,
+  getReservations,
 };

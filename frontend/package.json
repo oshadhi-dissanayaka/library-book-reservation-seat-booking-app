@@ -1,7 +1,19 @@
 {
   "name": "frontend",
-  "main": "expo-router/entry",
   "version": "1.0.0",
+  "private": true,
+  "description": "Library Book Reservation and Reading Room Seat Booking App",
+  "license": "ISC",
+  "type": "commonjs",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start --port 8082",
+    "reset-project": "node ./scripts/reset-project.js",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "lint": "expo lint"
+  },
   "dependencies": {
     "@expo/ui": "~57.0.21",
     "expo": "~57.0.26",
@@ -17,6 +29,7 @@
     "expo-symbols": "~57.0.3",
     "expo-system-ui": "~57.0.4",
     "expo-web-browser": "~57.0.3",
+    "nativewind": "^4.2.7",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-native": "0.86.3",
@@ -31,15 +44,7 @@
     "@types/react": "~19.2.2",
     "eslint": "^9.0.0",
     "eslint-config-expo": "~57.0.2",
+    "tailwindcss": "^3.4.19",
     "typescript": "~6.0.3"
-  },
-  "scripts": {
-    "start": "expo start --port 8082",
-    "reset-project": "node ./scripts/reset-project.js",
-    "android": "expo start --android",
-    "ios": "expo start --ios",
-    "web": "expo start --web",
-    "lint": "expo lint"
-  },
-  "private": true
+  }
 }
