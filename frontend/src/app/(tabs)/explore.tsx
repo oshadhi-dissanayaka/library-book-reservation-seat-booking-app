@@ -39,15 +39,15 @@ export default function TabTwoScreen() {
       contentContainerStyle={[styles.contentContainer, contentPlatformStyle]}>
       <ThemedView style={styles.container}>
         <ThemedView style={styles.titleContainer}>
-          <ThemedText type="subtitle">Explore</ThemedText>
+          <ThemedText type="subtitle">Library Guide & Policies</ThemedText>
           <ThemedText style={styles.centerText} themeColor="textSecondary">
-            This starter app includes example{'\n'}code to help you get started.
+            Essential guidelines for book reservations,{'\n'}study seat bookings, and circulation services.
           </ThemedText>
 
-          <ExternalLink href="https://docs.expo.dev" asChild>
+          <ExternalLink href="https://library.university.edu" asChild>
             <Pressable style={({ pressed }) => pressed && styles.pressed}>
               <ThemedView type="backgroundElement" style={styles.linkButton}>
-                <ThemedText type="link">Expo documentation</ThemedText>
+                <ThemedText type="link">Institutional Library Portal</ThemedText>
                 <SymbolView
                   tintColor={theme.text}
                   name={{ ios: 'arrow.up.right.square', android: 'link', web: 'link' }}
@@ -59,63 +59,48 @@ export default function TabTwoScreen() {
         </ThemedView>
 
         <ThemedView style={styles.sectionsWrapper}>
-          <Collapsible title="File-based routing">
+          <Collapsible title="Book Borrowing & Reservation Policy">
             <ThemedText type="small">
-              This app has two screens: <ThemedText type="code">src/app/index.tsx</ThemedText> and{' '}
-              <ThemedText type="code">src/app/explore.tsx</ThemedText>
+              • Standard undergraduate loan duration is 14 days per item.
             </ThemedText>
             <ThemedText type="small">
-              The layout file in <ThemedText type="code">src/app/_layout.tsx</ThemedText> sets up
-              the tab navigator.
+              • Reserved copies are prepared at Circulation Desk 01 and held for 24 hours after reservation confirmation.
             </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/router/introduction">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
-          </Collapsible>
-
-          <Collapsible title="Android, iOS, and web support">
-            <ThemedView type="backgroundElement" style={styles.collapsibleContent}>
-              <ThemedText type="small">
-                You can open this project on Android, iOS, and the web. To open the web version,
-                press <ThemedText type="smallBold">w</ThemedText> in the terminal running this
-                project.
-              </ThemedText>
-              <Image
-                source={require('@/assets/images/tutorial-web.png')}
-                style={styles.imageTutorial}
-              />
-            </ThemedView>
-          </Collapsible>
-
-          <Collapsible title="Images">
             <ThemedText type="small">
-              For static images, you can use the <ThemedText type="code">@2x</ThemedText> and{' '}
-              <ThemedText type="code">@3x</ThemedText> suffixes to provide files for different
-              screen densities.
+              • Renewals may be requested via the portal if no hold requests are placed by other readers.
             </ThemedText>
-            <Image source={require('@/assets/images/react-logo.png')} style={styles.imageReact} />
-            <ExternalLink href="https://reactnative.dev/docs/images">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
           </Collapsible>
 
-          <Collapsible title="Light and dark mode components">
+          <Collapsible title="Reading-Room Seat Booking Guidelines">
             <ThemedText type="small">
-              This template has light and dark mode support. The{' '}
-              <ThemedText type="code">useColorScheme()</ThemedText> hook lets you inspect what the
-              user&apos;s current color scheme is, and so you can adjust UI colors accordingly.
+              • Study room bookings operate on designated 2-hour and 4-hour quiet study slots.
             </ThemedText>
-            <ExternalLink href="https://docs.expo.dev/develop/user-interface/color-themes/">
-              <ThemedText type="linkPrimary">Learn more</ThemedText>
-            </ExternalLink>
+            <ThemedText type="small">
+              • A 15-minute grace period applies from the booking start time. Unclaimed seats are automatically released for other students.
+            </ThemedText>
+            <ThemedText type="small">
+              • Please maintain quiet study etiquette and ensure mobile devices remain in silent mode.
+            </ThemedText>
           </Collapsible>
 
-          <Collapsible title="Animations">
+          <Collapsible title="Operating Hours & Service Schedules">
             <ThemedText type="small">
-              This template includes an example of an animated component. The{' '}
-              <ThemedText type="code">src/components/ui/collapsible.tsx</ThemedText> component uses
-              the powerful <ThemedText type="code">react-native-reanimated</ThemedText> library to
-              animate opening this hint.
+              • Monday – Friday: 08:00 AM – 20:00 PM
+            </ThemedText>
+            <ThemedText type="small">
+              • Saturday – Sunday: 09:00 AM – 17:00 PM
+            </ThemedText>
+            <ThemedText type="small">
+              • Circulation Desk transactions close 30 minutes before official library closing time.
+            </ThemedText>
+          </Collapsible>
+
+          <Collapsible title="Circulation Desk & Helpdesk Support">
+            <ThemedText type="small">
+              • Circulation Desk 01 is located on the Ground Floor Main Hall for in-person pickups and returns.
+            </ThemedText>
+            <ThemedText type="small">
+              • For catalog inquiries, inter-library loan requests, or account assistance, visit the desk or contact circulation-desk@university.edu.
             </ThemedText>
           </Collapsible>
         </ThemedView>

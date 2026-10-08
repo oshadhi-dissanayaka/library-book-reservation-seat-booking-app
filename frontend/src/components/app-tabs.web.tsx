@@ -25,10 +25,10 @@ export default function AppTabs() {
       <TabSlot style={styles.tabSlot} />
       <TabList asChild>
         <CustomTabList>
-          <TabTrigger name="home" href="/" asChild>
+          <TabTrigger name="home" href={"/" as any} asChild>
             <TabButton>Home</TabButton>
           </TabTrigger>
-          <TabTrigger name="explore" href="/explore" asChild>
+          <TabTrigger name="explore" href={"/explore" as any} asChild>
             <TabButton>Explore</TabButton>
           </TabTrigger>
           <TabTrigger name="reading-rooms" href="/reading-rooms" asChild>

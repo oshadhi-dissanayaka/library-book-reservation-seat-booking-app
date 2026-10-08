@@ -11,7 +11,7 @@
 // ============================================================
 
 const mongoose = require("mongoose");
-const Reservation = require("../models/Reservation");
+const Reservation = require("../models/SeatReservation");
 const ReadingRoom = require("../models/ReadingRoom");
 
 // Shown whenever a seat is already taken

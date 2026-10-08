@@ -1,93 +1,148 @@
-// ============================================================
-// Reservation model (WF-11 Seat Reservation)
-// IT3060 HCI Milestone 03
-//
-// One document = one seat held in one reading room for one
-// date + time block. There is intentionally NO payment and NO
-// authentication yet: studentId is a simple string placeholder.
-// ============================================================
-
 const mongoose = require("mongoose");
 
 const reservationSchema = new mongoose.Schema(
   {
-    // Which reading room the seat belongs to
-    readingRoom: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "ReadingRoom",
-      required: [true, "Reading room is required"],
-    },
-
-    // Booking day, stored as "YYYY-MM-DD" (e.g. "2026-10-16")
-    date: {
+    reservationId: {
       type: String,
-      required: [true, "Date is required"],
-      match: [/^\d{4}-\d{2}-\d{2}$/, "Date must be in YYYY-MM-DD format"],
-    },
-
-    // Time block chosen on the seat grid (e.g. "10:00 AM")
-    time: {
-      type: String,
-      required: [true, "Time is required"],
+      required: true,
+      unique: true,
       trim: true,
-      maxlength: [30, "Time is too long"],
     },
-
-    // Seat number inside that room (e.g. 7)
-    seatNumber: {
-      type: Number,
-      required: [true, "Seat number is required"],
-      min: [1, "Seat number must be a positive integer"],
-      validate: {
-        validator: Number.isInteger,
-        message: "Seat number must be a positive integer",
-      },
-    },
-
-    // Only two states for now
-    status: {
+    type: {
       type: String,
-      enum: {
-        values: ["active", "cancelled"],
-        message: "Status must be active or cancelled",
-      },
-      default: "active",
+      enum: ["Book", "Seat"],
+      default: "Book",
     },
-
-    // Placeholder owner (no login system in this milestone)
     studentId: {
       type: String,
-      default: "demo-student",
+      required: true,
       trim: true,
+    },
+    studentName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+    studentProgram: {
+      type: String,
+      default: "BSc (Hons) in Information Technology",
+    },
+    book: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Book",
+      default: null,
+    },
+    bookTitle: {
+      type: String,
+      default: "",
+    },
+    bookSubtitle: {
+      type: String,
+      default: "",
+    },
+    bookAuthor: {
+      type: String,
+      default: "",
+    },
+    bookEdition: {
+      type: String,
+      default: "",
+    },
+    bookShelf: {
+      type: String,
+      default: "",
+    },
+    pickupDate: {
+      type: String,
+      default: "",
+    },
+    pickupLocation: {
+      type: String,
+      default: "Main Library - Circulation Desk 01",
+    },
+    loanDuration: {
+      type: String,
+      default: "14 Days",
+    },
+    seat: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Seat",
+      default: null,
+    },
+    seatNumber: {
+      type: String,
+      default: "",
+    },
+    room: {
+      type: String,
+      default: "Reading Room A",
+    },
+    timeSlot: {
+      type: String,
+      default: "10:00 AM - 12:00 PM",
+    },
+    status: {
+      type: String,
+      enum: [
+        "CONFIRMED",
+        "READY_FOR_PICKUP",
+        "EXCEPTION",
+        "CANCELLED",
+        "NO_SHOW",
+        "COMPLETED",
+        "REJECTED",
+      ],
+      default: "CONFIRMED",
+    },
+    requiresAttention: {
+      type: Boolean,
+      default: false,
+    },
+    attentionType: {
+      type: String,
+      enum: ["NONE", "PENDING_REVIEW", "DAMAGED_REPORT", "OVERDUE", "EXCEPTION"],
+      default: "NONE",
+    },
+    attentionReason: {
+      type: String,
+      default: "",
+    },
+    deskNote: {
+      type: String,
+      default: "",
+    },
+    rejectionReason: {
+      type: String,
+      default: "",
+    },
+    rejectionExplanation: {
+      type: String,
+      default: "",
+    },
+    rejectionStaffId: {
+      type: String,
+      default: "",
+    },
+    rejectionDate: {
+      type: Date,
+      default: null,
+    },
+    cancellationSource: {
+      type: String,
+      enum: ["NONE", "STUDENT_PORTAL", "STAFF_ACTION", "SYSTEM_AUTO"],
+      default: "NONE",
+    },
+    noShowRecordedAt: {
+      type: Date,
+      default: null,
     },
   },
   {
-    timestamps: true, // adds createdAt + updatedAt
-
-    // IMPORTANT: seat bookings live in their OWN collection so they never
-    // touch the book-reservation documents (and unique indexes) another
-    // team member keeps in the shared "reservations" collection.
-    collection: "seatreservations",
+    timestamps: true,
+    collection: "reservations",
   }
 );
 
-// ------------------------------------------------------------
-// Uniqueness rule:
-// The same seat cannot be held twice for the same
-// readingRoom + date + time AS LONG AS the existing booking is
-// "active". A cancelled booking no longer blocks the seat, so
-// the index only applies to active documents
-// (partialFilterExpression).
-// ------------------------------------------------------------
-reservationSchema.index(
-  { readingRoom: 1, date: 1, time: 1, seatNumber: 1 },
-  {
-    unique: true,
-    name: "uniq_active_seat_per_slot",
-    partialFilterExpression: { status: "active" },
-  }
-);
-
-const Reservation = mongoose.model("Reservation", reservationSchema);
-
-module.exports = Reservation;
+module.exports =
+  mongoose.models.Reservation ||
+  mongoose.model("Reservation", reservationSchema);
