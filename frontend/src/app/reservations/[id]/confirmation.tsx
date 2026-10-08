@@ -7,7 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
  * Reached from the WF-10 seat grid after POST /api/reservations
  * succeeds. All details arrive as route params (no extra endpoint):
  *   id, confirmationCode, roomName, building, floor, date, time,
- *   seatNumber, status
+ *   blockCount, seatNumber, status
  *
  * Shares the WF-09/WF-10 visual language: off-white background,
  * white rounded cards, dark blue primary action.
@@ -22,12 +22,14 @@ export default function ReservationConfirmationScreen() {
     floor?: string;
     date?: string;
     time?: string;
+    blockCount?: string;
     seatNumber?: string;
     status?: string;
   }>();
 
   const id = params.id ?? '';
   const status = params.status ?? 'active';
+  const blockCount = Math.max(1, Number(params.blockCount) || 1);
 
   const statusLabel =
     status === 'active' ? 'Active' : status === 'cancelled' ? 'Cancelled' : status;
@@ -85,6 +87,12 @@ export default function ReservationConfirmationScreen() {
           <Text style={styles.detailLabel}>Time</Text>
           <Text style={styles.detailValue}>{params.time || '—'}</Text>
         </View>
+        {blockCount > 1 && (
+          <View style={styles.detailRow}>
+            <Text style={styles.detailLabel}>Duration</Text>
+            <Text style={styles.detailValue}>{blockCount} × 2-hour blocks</Text>
+          </View>
+        )}
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Seat number</Text>
           <Text style={styles.detailValue}>{params.seatNumber || '—'}</Text>

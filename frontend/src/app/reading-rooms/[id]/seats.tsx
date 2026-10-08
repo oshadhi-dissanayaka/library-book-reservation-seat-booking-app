@@ -24,9 +24,9 @@ import {
  *
  * Fixed 2-hour time blocks: the time is NOT sent by WF-09. This screen
  * generates every complete 2-hour block that fits inside the room's
- * openingTime/closingTime (buildTimeBlocks below) and queries occupancy
- * for room + date + selected block, so changing the block always
- * re-queries the seats for that exact block.
+ * openingTime/closingTime (buildTimeBlocks below). Users may select a
+ * continuous range, and seat occupancy is combined across every block
+ * in that range.
  */
 
 // Backend address (same convention as the WF-09 screen): the host the
@@ -122,6 +122,46 @@ function buildTimeBlocks(openingTime: string, closingTime: string): string[] {
   return blocks;
 }
 
+function formatContinuousRange(blocks: string[]): string {
+  if (blocks.length === 0) return '';
+  if (blocks.length === 1) return blocks[0];
+
+  const firstStart = blocks[0].split(' – ')[0];
+  const lastEnd = blocks[blocks.length - 1].split(' – ')[1];
+  return firstStart && lastEnd ? `${firstStart} – ${lastEnd}` : blocks.join(', ');
+}
+
+async function fetchOccupiedSeatsForBlocks(
+  roomId: string,
+  isoDate: string,
+  blocks: string[]
+): Promise<number[]> {
+  const reservationLists = await Promise.all(
+    blocks.map(async (block) => {
+      const reservationsUrl =
+        `${API_BASE_URL}/api/reservations?readingRoom=${encodeURIComponent(roomId)}` +
+        `&date=${isoDate}&time=${encodeURIComponent(block)}`;
+      const response = await fetch(reservationsUrl);
+      if (!response.ok) {
+        throw new Error(`Server responded with status ${response.status}`);
+      }
+      const data = await response.json();
+      return Array.isArray(data.reservations)
+        ? (data.reservations as ReservationSummary[])
+        : [];
+    })
+  );
+
+  return [
+    ...new Set(
+      reservationLists
+        .flat()
+        .filter((reservation) => reservation.status === 'active')
+        .map((reservation) => reservation.seatNumber)
+    ),
+  ];
+}
+
 export default function SeatAvailabilityScreen() {
   const { id, date } = useLocalSearchParams<{
     id?: string;
@@ -133,16 +173,15 @@ export default function SeatAvailabilityScreen() {
   const [error, setError] = useState('');
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
 
-  // Fixed 2-hour time blocks for THIS room (built from opening/closing
-  // hours) and the block currently selected.
+  // Selected blocks are always stored in room order as one continuous range.
   const [timeBlocks, setTimeBlocks] = useState<string[]>([]);
-  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+  const [selectedTimes, setSelectedTimes] = useState<string[]>([]);
 
   // WF-11 states
   const [reservedSeats, setReservedSeats] = useState<number[]>([]);
   // Starts true so the seat map is never shown before the selected
-  // block's occupancy has been loaded.
-  const [occupancyLoading, setOccupancyLoading] = useState(true);
+  // selected range's combined occupancy has been loaded.
+  const [occupancyLoading, setOccupancyLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reserveError, setReserveError] = useState('');
 
@@ -185,12 +224,8 @@ export default function SeatAvailabilityScreen() {
         const blocks = buildTimeBlocks(found.openingTime, found.closingTime);
         setRoom(found);
         setTimeBlocks(blocks);
-        setSelectedTime(
-          (current) =>
-            (current !== null && blocks.includes(current) ? current : blocks[0]) ?? null
-        );
-        // Room hours that fit no complete 2-hour block -> nothing to query.
-        if (blocks.length === 0) setOccupancyLoading(false);
+        setSelectedTimes([]);
+        setOccupancyLoading(false);
       } catch (requestError) {
         if (!active) return;
         const detail =
@@ -209,37 +244,26 @@ export default function SeatAvailabilityScreen() {
     };
   }, [id]);
 
-  // Seats occupied for EXACTLY this room + date + selected 2-hour block.
-  // Re-runs on every block change, so the previous block's occupancy is
-  // never kept on screen.
+  // A seat is unavailable if it is occupied in ANY selected block.
   useEffect(() => {
     let active = true;
 
-    // Room still loading, or the room has no valid block.
-    if (!id || !isoDate || !selectedTime) return () => { active = false; };
+    if (!id || !isoDate || selectedTimes.length === 0) {
+      setReservedSeats([]);
+      setSelectedSeat(null);
+      setOccupancyLoading(false);
+      return () => {
+        active = false;
+      };
+    }
 
     const loadOccupancy = async () => {
       setOccupancyLoading(true);
-      setReservedSeats([]); // drop the previous block's seats at once
-      setSelectedSeat(null); // a seat selection belongs to one block only
+      setReservedSeats([]);
+      setSelectedSeat(null);
       setReserveError('');
       try {
-        const reservationsUrl =
-          `${API_BASE_URL}/api/reservations?readingRoom=${encodeURIComponent(id)}` +
-          `&date=${isoDate}&time=${encodeURIComponent(selectedTime)}`;
-        const reservationsResponse = await fetch(reservationsUrl);
-        if (!reservationsResponse.ok) {
-          throw new Error(`Server responded with status ${reservationsResponse.status}`);
-        }
-        const reservationsData = await reservationsResponse.json();
-        const reservations: ReservationSummary[] = Array.isArray(
-          reservationsData.reservations
-        )
-          ? reservationsData.reservations
-          : [];
-        const taken = reservations
-          .filter((item) => item.status === 'active')
-          .map((item) => item.seatNumber);
+        const taken = await fetchOccupiedSeatsForBlocks(id, isoDate, selectedTimes);
         if (active) setReservedSeats(taken);
       } catch (requestError) {
         if (!active) return;
@@ -257,7 +281,36 @@ export default function SeatAvailabilityScreen() {
     return () => {
       active = false;
     };
-  }, [id, isoDate, selectedTime]);
+  }, [id, isoDate, selectedTimes]);
+
+  const toggleTimeBlock = (block: string) => {
+    const blockIndex = timeBlocks.indexOf(block);
+    const selectedIndex = selectedTimes.indexOf(block);
+
+    setSelectedSeat(null);
+    setReservedSeats([]);
+    setReserveError('');
+
+    if (selectedIndex >= 0) {
+      // Removing a selected block also removes every later block, so a gap
+      // can never remain in the range.
+      setOccupancyLoading(selectedIndex > 0);
+      setSelectedTimes((current) => current.slice(0, selectedIndex));
+      return;
+    }
+
+    if (selectedTimes.length === 0) {
+      setOccupancyLoading(true);
+      setSelectedTimes([block]);
+      return;
+    }
+
+    const lastSelectedIndex = timeBlocks.indexOf(selectedTimes[selectedTimes.length - 1]);
+    if (blockIndex === lastSelectedIndex + 1) {
+      setOccupancyLoading(true);
+      setSelectedTimes((current) => [...current, block]);
+    }
+  };
 
   // Seats actually inside this room's grid (defensive filter).
   const occupiedSeats = room
@@ -274,63 +327,101 @@ export default function SeatAvailabilityScreen() {
     setSelectedSeat((current) => (current === seat ? null : seat));
   };
 
-  // WF-11 — POST the reservation, then go to the WF-12 confirmation screen.
+  // WF-11 — preflight the full range, then create one existing reservation
+  // record per selected 2-hour block.
   const handleReserve = async () => {
-    if (selectedSeat === null || !room || !date || !isoDate || !selectedTime || saving) {
+    if (
+      selectedSeat === null ||
+      !room ||
+      !date ||
+      !isoDate ||
+      selectedTimes.length === 0 ||
+      saving
+    ) {
       return;
     }
     setSaving(true);
     setReserveError('');
     try {
-      const response = await fetch(`${API_BASE_URL}/api/reservations`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          readingRoom: room._id,
-          date: isoDate,
-          time: selectedTime, // the fixed 2-hour block, e.g. "10:00 AM – 12:00 PM"
-          seatNumber: selectedSeat,
-        }),
-      });
-
-      let data: CreatedReservation | null = null;
-      try {
-        data = (await response.json()) as CreatedReservation;
-      } catch {
-        data = null;
-      }
-
-      // Seat was taken between loading the grid and pressing Reserve.
-      if (response.status === 409) {
+      const latestOccupiedSeats = await fetchOccupiedSeatsForBlocks(
+        room._id,
+        isoDate,
+        selectedTimes
+      );
+      if (latestOccupiedSeats.includes(selectedSeat)) {
         setReserveError(
-          'This seat is no longer available. Please select another seat.'
+          'One or more selected time blocks are no longer available. Please choose another time.'
         );
-        setReservedSeats((current) =>
-          current.includes(selectedSeat) ? current : [...current, selectedSeat]
-        );
+        setReservedSeats(latestOccupiedSeats);
         setSelectedSeat(null);
         return;
       }
 
-      if (!response.ok || !data || !data._id) {
-        throw new Error(
-          data?.message ?? `Server responded with status ${response.status}`
-        );
+      const createdReservations: CreatedReservation[] = [];
+
+      for (const block of selectedTimes) {
+        const response = await fetch(`${API_BASE_URL}/api/reservations`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            readingRoom: room._id,
+            date: isoDate,
+            time: block,
+            seatNumber: selectedSeat,
+          }),
+        });
+
+        let data: CreatedReservation | null = null;
+        try {
+          data = (await response.json()) as CreatedReservation;
+        } catch {
+          data = null;
+        }
+
+        if (response.status === 409) {
+          setSelectedSeat(null);
+          if (createdReservations.length === 0) {
+            setReserveError(
+              'One or more selected time blocks are no longer available. Please choose another time.'
+            );
+            return;
+          }
+          throw new Error(
+            `${createdReservations.length} earlier block(s) were saved before a later block became unavailable. Please review My Reservations.`
+          );
+        }
+
+        if (!response.ok || !data || !data._id) {
+          const prefix =
+            createdReservations.length > 0
+              ? `${createdReservations.length} earlier block(s) were saved. `
+              : '';
+          throw new Error(
+            `${prefix}${data?.message ?? `Server responded with status ${response.status}`}`
+          );
+        }
+
+        createdReservations.push(data);
       }
 
+      const firstReservation = createdReservations[0];
+      if (!firstReservation?._id) {
+        throw new Error('The reservation response did not include a confirmation id.');
+      }
       // WF-12 — never silently go back: show the confirmation screen.
       router.push({
         pathname: '/reservations/[id]/confirmation',
         params: {
-          id: data._id,
-          confirmationCode: data.confirmationCode ?? '',
+          id: firstReservation._id,
+          confirmationCode: firstReservation.confirmationCode ?? '',
           roomName: room.name,
           building: room.building,
           floor: room.floor,
           date,
-          time: selectedTime, // fixed 2-hour block shown on WF-12
+          time: formatContinuousRange(selectedTimes),
+          blockCount: String(selectedTimes.length),
           seatNumber: String(selectedSeat),
-          status: data.status ?? 'active',
+          status: firstReservation.status ?? 'active',
         },
       });
     } catch (requestError) {
@@ -399,33 +490,44 @@ export default function SeatAvailabilityScreen() {
                 {Array.from({ length: Math.ceil(timeBlocks.length / 2) }, (_, rowIndex) => (
                   <View key={rowIndex} style={styles.timeChipRow}>
                     {timeBlocks.slice(rowIndex * 2, rowIndex * 2 + 2).map((block) => {
-                      const isSelected = selectedTime === block;
+                      const blockIndex = timeBlocks.indexOf(block);
+                      const isSelected = selectedTimes.includes(block);
+                      const lastSelectedIndex =
+                        selectedTimes.length > 0
+                          ? timeBlocks.indexOf(selectedTimes[selectedTimes.length - 1])
+                          : -1;
+                      const isNextAdjacent =
+                        selectedTimes.length > 0 && blockIndex === lastSelectedIndex + 1;
+                      const isDisabled =
+                        selectedTimes.length > 0 && !isSelected && !isNextAdjacent;
                       return (
                         <Pressable
                           key={block}
+                          disabled={isDisabled}
                           accessibilityRole="button"
-                          accessibilityLabel={`Time block ${block}`}
-                          accessibilityState={{ selected: isSelected }}
+                          accessibilityLabel={`Time block ${block}, ${
+                            isSelected
+                              ? 'selected'
+                              : isNextAdjacent || selectedTimes.length === 0
+                                ? 'available'
+                                : 'unavailable until adjacent blocks are selected'
+                          }`}
+                          accessibilityState={{ selected: isSelected, disabled: isDisabled }}
                           style={[
                             styles.timeChip,
                             isSelected && styles.timeChipSelected,
+                            isNextAdjacent && styles.timeChipAdjacent,
+                            isDisabled && styles.timeChipDisabled,
                           ]}
-                          onPress={() => {
-                            if (block === selectedTime) return;
-                            // Switching blocks: hide the old seat map at once so
-                            // the previous block's occupancy is never shown.
-                            setSelectedTime(block);
-                            setSelectedSeat(null);
-                            setReserveError('');
-                            setReservedSeats([]);
-                            setOccupancyLoading(true);
-                          }}>
+                          onPress={() => toggleTimeBlock(block)}>
                           <Text
                             style={[
                               styles.timeChipText,
                               isSelected && styles.timeChipSelectedText,
+                              isDisabled && styles.timeChipDisabledText,
                             ]}>
                             {block}
+                            {isSelected ? '  ✓' : isNextAdjacent ? '  +' : ''}
                           </Text>
                         </Pressable>
                       );
@@ -437,9 +539,24 @@ export default function SeatAvailabilityScreen() {
                 ))}
               </View>
             )}
+
+            {selectedTimes.length > 0 && (
+              <View style={styles.rangeSummary}>
+                <Text style={styles.rangeSummaryText}>
+                  {formatContinuousRange(selectedTimes)}
+                </Text>
+                <Text style={styles.rangeSummaryMeta}>
+                  {selectedTimes.length} × 2-hour {selectedTimes.length === 1 ? 'block' : 'blocks'}
+                </Text>
+              </View>
+            )}
+            <Text style={styles.timeHelpText}>
+              Select any starting block, then add the next adjacent block. Tap a selected
+              block to remove it and every later block.
+            </Text>
           </View>
 
-          {/* Occupancy for the SELECTED block only — never stale data */}
+          {/* Combined occupancy for every block in the continuous range. */}
           {occupancyLoading && (
             <View style={styles.card}>
               <ActivityIndicator size="large" color="#1E3A8A" />
@@ -447,7 +564,7 @@ export default function SeatAvailabilityScreen() {
             </View>
           )}
 
-          {!occupancyLoading && selectedTime !== null && (
+          {!occupancyLoading && selectedTimes.length > 0 && (
             <>
               {/* Seat summary */}
               <View style={styles.card}>
@@ -526,7 +643,9 @@ export default function SeatAvailabilityScreen() {
 
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Reserve the selected seat"
+              accessibilityLabel={`Reserve the selected seat for ${selectedTimes.length} time ${
+                selectedTimes.length === 1 ? 'block' : 'blocks'
+              }`}
               disabled={selectedSeat === null || saving}
               style={[
                 styles.primaryButton,
@@ -534,14 +653,21 @@ export default function SeatAvailabilityScreen() {
               ]}
               onPress={handleReserve}>
               <Text style={styles.primaryButtonText}>
-                {saving ? 'SAVING…' : 'RESERVE SEAT →'}
+                {saving
+                  ? 'SAVING…'
+                  : selectedTimes.length === 1
+                    ? 'RESERVE SEAT →'
+                    : `RESERVE ${selectedTimes.length} BLOCKS →`}
               </Text>
             </Pressable>
 
             {saving && (
               <View style={styles.savingRow}>
                 <ActivityIndicator size="small" color="#1E3A8A" />
-                <Text style={styles.savingText}>Saving your reservation…</Text>
+                <Text style={styles.savingText}>
+                  Saving {selectedTimes.length} reservation{' '}
+                  {selectedTimes.length === 1 ? 'block' : 'blocks'}…
+                </Text>
               </View>
             )}
 
@@ -558,8 +684,7 @@ export default function SeatAvailabilityScreen() {
             <Text style={styles.infoText}>
               Seats are held for 15 minutes after the booking start time. Please keep
               noise to a minimum and carry your Student ID. Occupied seats shown here
-              come from the live reservation list for your selected date and 2-hour
-              time block.
+              come from the live reservation lists for every selected 2-hour block.
             </Text>
           </View>
         </>
@@ -723,6 +848,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#1E3A8A',
     borderColor: '#1E3A8A',
   },
+  timeChipAdjacent: {
+    borderColor: '#1E3A8A',
+  },
+  timeChipDisabled: {
+    backgroundColor: '#F3F4F7',
+    borderColor: '#E3E6EF',
+    opacity: 0.55,
+  },
   timeChipText: {
     fontSize: 13,
     fontWeight: '700',
@@ -730,6 +863,31 @@ const styles = StyleSheet.create({
   },
   timeChipSelectedText: {
     color: '#FFFFFF',
+  },
+  timeChipDisabledText: {
+    color: '#8A90A2',
+  },
+  rangeSummary: {
+    backgroundColor: '#E9EDF9',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    gap: 2,
+  },
+  rangeSummaryText: {
+    color: '#12203F',
+    fontSize: 14,
+    fontWeight: '800',
+  },
+  rangeSummaryMeta: {
+    color: '#1E3A8A',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  timeHelpText: {
+    color: '#7A8199',
+    fontSize: 12,
+    lineHeight: 17,
   },
   grid: {
     flexDirection: 'row',

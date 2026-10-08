@@ -8,7 +8,7 @@ const mongoose = require("mongoose");
  * totalSeats is the room capacity shown while browsing availability.
  *
  * openingTime / closingTime are stored as 24-hour "HH:mm" strings
- * ("08:00" = 8:00 AM, "22:00" = 10:00 PM) so 2-hour slot blocks can be
+ * ("08:00" = 8:00 AM, "18:30" = 6:30 PM) so 2-hour slot blocks can be
  * generated and compared easily. The UI can format them as "08:00 AM".
  */
 const readingRoomSchema = new mongoose.Schema(
@@ -53,10 +53,10 @@ const readingRoomSchema = new mongoose.Schema(
     },
     closingTime: {
       type: String,
-      default: "22:00",
+      default: "18:30",
       match: [
         /^([01][0-9]|2[0-3]):[0-5][0-9]$/,
-        "closingTime must be 24-hour HH:mm (e.g. 22:00)",
+        "closingTime must be 24-hour HH:mm (e.g. 18:30)",
       ],
       validate: {
         validator: function (value) {

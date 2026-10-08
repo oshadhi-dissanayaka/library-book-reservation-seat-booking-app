@@ -7,8 +7,9 @@
  * DEV/SAMPLE DATA ONLY — these documents are example reading rooms for local
  * development and demos. They are not production data.
  *
- * The script is idempotent: rooms are matched on name + building + floor and
- * only inserted when missing, so running it twice creates no duplicates.
+ * The script is idempotent: rooms are matched on name + building + floor.
+ * Existing rooms receive the current operating hours; missing seed rooms are
+ * inserted without creating duplicates.
  */
 
 // Load backend/.env regardless of the folder the script is run from.
@@ -28,7 +29,7 @@ const developmentReadingRooms = [
       "Silent individual study desks with power outlets and high-speed Eduroam.",
     totalSeats: 24,
     openingTime: "08:00",
-    closingTime: "22:00",
+    closingTime: "18:30",
     status: "active",
   },
   {
@@ -40,7 +41,7 @@ const developmentReadingRooms = [
       "Window-side desks for quiet reading, suitable for group-free study.",
     totalSeats: 32,
     openingTime: "08:00",
-    closingTime: "22:00",
+    closingTime: "18:30",
     status: "active",
   },
   {
@@ -51,8 +52,8 @@ const developmentReadingRooms = [
     description:
       "Open-plan reading room with movable desks for discussion-based study.",
     totalSeats: 40,
-    openingTime: "09:00",
-    closingTime: "20:00",
+    openingTime: "08:00",
+    closingTime: "18:30",
     status: "active",
   },
 ];
@@ -69,12 +70,16 @@ async function seedReadingRooms() {
     console.log("MongoDB connected — seeding development reading rooms...");
 
     let inserted = 0;
-    let skipped = 0;
+    let updated = 0;
 
     for (const room of developmentReadingRooms) {
+      const { openingTime, closingTime, ...roomOnInsert } = room;
       const result = await ReadingRoom.updateOne(
         { name: room.name, building: room.building, floor: room.floor },
-        { $setOnInsert: room },
+        {
+          $set: { openingTime, closingTime },
+          $setOnInsert: roomOnInsert,
+        },
         { upsert: true }
       );
 
@@ -82,12 +87,12 @@ async function seedReadingRooms() {
         inserted += 1;
         console.log(`  inserted: ${room.name} (${room.building}, Floor ${room.floor})`);
       } else {
-        skipped += 1;
-        console.log(`  already exists, skipped: ${room.name}`);
+        updated += 1;
+        console.log(`  hours updated: ${room.name}`);
       }
     }
 
-    console.log(`Seed finished — inserted: ${inserted}, skipped: ${skipped}`);
+    console.log(`Seed finished — inserted: ${inserted}, hours updated: ${updated}`);
   } catch (error) {
     console.error("Seed failed:", error.message);
     process.exitCode = 1;

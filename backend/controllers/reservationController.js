@@ -16,6 +16,32 @@ const ReadingRoom = require("../models/ReadingRoom");
 
 // Shown whenever a seat is already taken
 const SEAT_TAKEN_MESSAGE = "This seat is no longer available. Please select another seat.";
+const BLOCK_MINUTES = 120;
+
+function toMinutesSinceMidnight(value) {
+  const [hour, minute] = value.split(":").map(Number);
+  return hour * 60 + minute;
+}
+
+function formatBlockEdge(totalMinutes) {
+  const hour = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  const period = hour >= 12 ? "PM" : "AM";
+  return `${String(hour12).padStart(2, "0")}:${String(minute).padStart(2, "0")} ${period}`;
+}
+
+function validTimeBlocksFor(room) {
+  const open = toMinutesSinceMidnight(room.openingTime);
+  const close = toMinutesSinceMidnight(room.closingTime);
+  const blocks = [];
+
+  for (let from = open; from + BLOCK_MINUTES <= close; from += BLOCK_MINUTES) {
+    blocks.push(`${formatBlockEdge(from)} – ${formatBlockEdge(from + BLOCK_MINUTES)}`);
+  }
+
+  return blocks;
+}
 
 // ------------------------------------------------------------
 // POST /api/reservations
@@ -48,11 +74,21 @@ const createReservation = async (req, res) => {
       return res.status(404).json({ message: "Reading room not found" });
     }
 
+    // Accept only the same complete, opening-time-aligned 2-hour blocks that
+    // WF-10 generates. Any remainder before closing is intentionally not
+    // bookable (for 08:00–18:30, the final valid block ends at 18:00).
+    const normalizedTime = time.trim();
+    if (!validTimeBlocksFor(room).includes(normalizedTime)) {
+      return res.status(400).json({
+        message: "Time must be a valid complete 2-hour block within reading room hours",
+      });
+    }
+
     // --- reject a seat that is already held (friendly pre-check) ---
     const existing = await Reservation.findOne({
       readingRoom,
       date,
-      time: time.trim(),
+      time: normalizedTime,
       seatNumber,
       status: "active",
     });
@@ -64,7 +100,7 @@ const createReservation = async (req, res) => {
     const reservation = await Reservation.create({
       readingRoom,
       date,
-      time: time.trim(),
+      time: normalizedTime,
       seatNumber,
       status: "active",
       studentId: "demo-student",
