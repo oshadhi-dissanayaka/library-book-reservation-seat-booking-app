@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import Constants from 'expo-constants';
+import { useFocusEffect } from 'expo-router';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 /**
@@ -71,53 +72,55 @@ export default function NotificationsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    let active = true;
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
 
-    const loadData = async () => {
-      setLoading(true);
-      setError('');
-      try {
-        const reservationsResponse = await fetch(`${API_BASE_URL}/api/reservations`);
-        if (!reservationsResponse.ok) {
-          throw new Error(`Server responded with status ${reservationsResponse.status}`);
-        }
-        const reservationsData = await reservationsResponse.json();
-        if (active) {
-          setReservations(
-            Array.isArray(reservationsData.reservations) ? reservationsData.reservations : []
-          );
-        }
-
-        // Room names are display-only — best effort.
+      const loadData = async () => {
+        setLoading(true);
+        setError('');
         try {
-          const roomsResponse = await fetch(`${API_BASE_URL}/api/reading-rooms`);
-          if (roomsResponse.ok) {
-            const roomsData = await roomsResponse.json();
-            if (active) {
-              setRooms(Array.isArray(roomsData.readingRooms) ? roomsData.readingRooms : []);
-            }
+          const reservationsResponse = await fetch(`${API_BASE_URL}/api/reservations`);
+          if (!reservationsResponse.ok) {
+            throw new Error(`Server responded with status ${reservationsResponse.status}`);
           }
-        } catch {
-          // Messages fall back to a generic room label below.
-        }
-      } catch (requestError) {
-        if (!active) return;
-        const detail =
-          requestError instanceof Error ? requestError.message : 'Unknown error';
-        setError(
-          `Could not load notifications. ${detail}. Please check that the backend server is running.`
-        );
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
+          const reservationsData = await reservationsResponse.json();
+          if (active) {
+            setReservations(
+              Array.isArray(reservationsData.reservations) ? reservationsData.reservations : []
+            );
+          }
 
-    loadData();
-    return () => {
-      active = false;
-    };
-  }, []);
+          // Room names are display-only — best effort.
+          try {
+            const roomsResponse = await fetch(`${API_BASE_URL}/api/reading-rooms`);
+            if (roomsResponse.ok) {
+              const roomsData = await roomsResponse.json();
+              if (active) {
+                setRooms(Array.isArray(roomsData.readingRooms) ? roomsData.readingRooms : []);
+              }
+            }
+          } catch {
+            // Messages fall back to a generic room label below.
+          }
+        } catch (requestError) {
+          if (!active) return;
+          const detail =
+            requestError instanceof Error ? requestError.message : 'Unknown error';
+          setError(
+            `Could not load notifications. ${detail}. Please check that the backend server is running.`
+          );
+        } finally {
+          if (active) setLoading(false);
+        }
+      };
+
+      loadData();
+      return () => {
+        active = false;
+      };
+    }, [])
+  );
 
   // Build the local notification list from the active reservations.
   const items: NotificationItem[] = [];

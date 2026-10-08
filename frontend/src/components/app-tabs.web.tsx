@@ -10,6 +10,7 @@ import { SymbolView } from 'expo-symbols';
 import { Pressable, useColorScheme, View, StyleSheet } from 'react-native';
 
 import { ExternalLink } from './external-link';
+import { NotificationButton } from './notification-button';
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
@@ -18,7 +19,10 @@ import { Colors, MaxContentWidth, Spacing } from '@/constants/theme';
 export default function AppTabs() {
   return (
     <Tabs>
-      <TabSlot style={{ height: '100%' }} />
+      <ThemedView style={styles.header}>
+        <NotificationButton />
+      </ThemedView>
+      <TabSlot style={styles.tabSlot} />
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="home" href="/" asChild>
@@ -33,9 +37,12 @@ export default function AppTabs() {
           <TabTrigger name="reservations" href="/reservations" asChild>
             <TabButton>Reservations</TabButton>
           </TabTrigger>
-          <TabTrigger name="notifications" href="/notifications" asChild>
-            <TabButton>Notifications</TabButton>
-          </TabTrigger>
+          {/* Register the route without rendering it in the bottom navigation. */}
+          <TabTrigger
+            name="notifications"
+            href="/notifications"
+            style={styles.hiddenRoute}
+          />
         </CustomTabList>
       </TabList>
     </Tabs>
@@ -85,6 +92,19 @@ export function CustomTabList(props: TabListProps) {
 }
 
 const styles = StyleSheet.create({
+  header: {
+    minHeight: 60,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#E0E1E6',
+  },
+  tabSlot: {
+    flex: 1,
+  },
+  hiddenRoute: {
+    display: 'none',
+  },
   tabListContainer: {
     position: 'absolute',
     width: '100%',

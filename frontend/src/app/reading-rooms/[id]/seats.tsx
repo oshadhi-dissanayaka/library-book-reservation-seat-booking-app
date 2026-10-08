@@ -21,6 +21,12 @@ import {
  *
  * WF-09 sends `date` as a friendly label ("7 October 2026") for display;
  * the API stores dates as "YYYY-MM-DD", converted by toIsoDate() below.
+ *
+ * Fixed 2-hour time blocks: the time is NOT sent by WF-09. This screen
+ * generates every complete 2-hour block that fits inside the room's
+ * openingTime/closingTime (buildTimeBlocks below) and queries occupancy
+ * for room + date + selected block, so changing the block always
+ * re-queries the seats for that exact block.
  */
 
 // Backend address (same convention as the WF-09 screen): the host the
@@ -35,6 +41,8 @@ type ReadingRoom = {
   floor: string;
   zone: string;
   totalSeats: number;
+  openingTime: string; // "08:00" (24-hour) — used to build the 2-hour blocks
+  closingTime: string; // "22:00" (24-hour)
 };
 
 type ReservationSummary = {
@@ -71,11 +79,53 @@ function toIsoDate(label: string): string | null {
   return `${year}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
+/** "08:00" -> 480 (minutes since midnight), or NaN if malformed. */
+function toMinutesSinceMidnight(value: string): number {
+  const parts = value.split(':');
+  const hour = Number(parts[0]);
+  const minute = Number(parts[1]);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return NaN;
+  return hour * 60 + minute;
+}
+
+/** 480 -> "08:00 AM" (one edge of a block,12-hour clock like the rest of the UI). */
+function formatBlockEdge(totalMinutes: number): string {
+  const hour = Math.floor(totalMinutes / 60) % 24;
+  const minute = totalMinutes % 60;
+  const hour12 = hour % 12 === 0 ? 12 : hour % 12;
+  const period = hour >= 12 ? 'PM' : 'AM';
+  return `${String(hour12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${period}`;
+}
+
+/**
+ * Every COMPLETE 2-hour block that fits inside the room's opening hours.
+ *
+ *   Reading Room A (08:00–22:00) -> 7 blocks:
+ *     "08:00 AM – 10:00 AM" … "08:00 PM – 10:00 PM"
+ *   Reading Room C (09:00–20:00) -> 5 blocks:
+ *     "09:00 AM – 11:00 AM" … "05:00 PM – 07:00 PM"
+ *
+ * The returned string is BOTH the chip label and the `time` value sent to
+ * the reservation API, so the block on screen always matches the stored
+ * reservation. No arbitrary start/end times — only these fixed blocks.
+ */
+function buildTimeBlocks(openingTime: string, closingTime: string): string[] {
+  const BLOCK_MINUTES = 120;
+  const open = toMinutesSinceMidnight(openingTime);
+  const close = toMinutesSinceMidnight(closingTime);
+  if (!Number.isFinite(open) || !Number.isFinite(close)) return [];
+
+  const blocks: string[] = [];
+  for (let from = open; from + BLOCK_MINUTES <= close; from += BLOCK_MINUTES) {
+    blocks.push(`${formatBlockEdge(from)} – ${formatBlockEdge(from + BLOCK_MINUTES)}`);
+  }
+  return blocks;
+}
+
 export default function SeatAvailabilityScreen() {
-  const { id, date, time } = useLocalSearchParams<{
+  const { id, date } = useLocalSearchParams<{
     id?: string;
     date?: string;
-    time?: string;
   }>();
 
   const [room, setRoom] = useState<ReadingRoom | null>(null);
@@ -83,24 +133,39 @@ export default function SeatAvailabilityScreen() {
   const [error, setError] = useState('');
   const [selectedSeat, setSelectedSeat] = useState<number | null>(null);
 
+  // Fixed 2-hour time blocks for THIS room (built from opening/closing
+  // hours) and the block currently selected.
+  const [timeBlocks, setTimeBlocks] = useState<string[]>([]);
+  const [selectedTime, setSelectedTime] = useState<string | null>(null);
+
   // WF-11 states
   const [reservedSeats, setReservedSeats] = useState<number[]>([]);
+  // Starts true so the seat map is never shown before the selected
+  // block's occupancy has been loaded.
+  const [occupancyLoading, setOccupancyLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [reserveError, setReserveError] = useState('');
 
   // Friendly label from WF-09 -> "YYYY-MM-DD" for the API.
   const isoDate = date ? toIsoDate(date) : null;
 
-  // Load the room (existing WF-09 endpoint) plus the seats already
-  // reserved for this room + date + time (reservation API).
+  // Load the room (existing WF-09 endpoint) and build its fixed 2-hour
+  // time blocks. The first block becomes the default selection.
   useEffect(() => {
     let active = true;
 
-    const loadData = async () => {
+    const loadRoom = async () => {
       setLoading(true);
       setError('');
       try {
-        // 1. Reading room info
+        // WF-09 always sends a date; without one there is nothing to query.
+        if (!isoDate) {
+          setError(
+            'Date not selected. Please go back and pick a date on the Reading Room Search screen.'
+          );
+          return;
+        }
+
         const roomsResponse = await fetch(`${API_BASE_URL}/api/reading-rooms`);
         if (!roomsResponse.ok) {
           throw new Error(`Server responded with status ${roomsResponse.status}`);
@@ -115,31 +180,17 @@ export default function SeatAvailabilityScreen() {
           if (active) setError('Reading room not found.');
           return;
         }
-        if (active) {
-          setRoom(found);
-          setReservedSeats([]);
-        }
+        if (!active) return;
 
-        // 2. Seats already reserved for this exact slot (WF-10/11 query)
-        if (id && isoDate && time) {
-          const reservationsUrl =
-            `${API_BASE_URL}/api/reservations?readingRoom=${encodeURIComponent(id)}` +
-            `&date=${isoDate}&time=${encodeURIComponent(time)}`;
-          const reservationsResponse = await fetch(reservationsUrl);
-          if (!reservationsResponse.ok) {
-            throw new Error(`Server responded with status ${reservationsResponse.status}`);
-          }
-          const reservationsData = await reservationsResponse.json();
-          const reservations: ReservationSummary[] = Array.isArray(
-            reservationsData.reservations
-          )
-            ? reservationsData.reservations
-            : [];
-          const taken = reservations
-            .filter((item) => item.status === 'active')
-            .map((item) => item.seatNumber);
-          if (active) setReservedSeats(taken);
-        }
+        const blocks = buildTimeBlocks(found.openingTime, found.closingTime);
+        setRoom(found);
+        setTimeBlocks(blocks);
+        setSelectedTime(
+          (current) =>
+            (current !== null && blocks.includes(current) ? current : blocks[0]) ?? null
+        );
+        // Room hours that fit no complete 2-hour block -> nothing to query.
+        if (blocks.length === 0) setOccupancyLoading(false);
       } catch (requestError) {
         if (!active) return;
         const detail =
@@ -152,11 +203,61 @@ export default function SeatAvailabilityScreen() {
       }
     };
 
-    loadData();
+    loadRoom();
     return () => {
       active = false;
     };
-  }, [id, isoDate, time]);
+  }, [id]);
+
+  // Seats occupied for EXACTLY this room + date + selected 2-hour block.
+  // Re-runs on every block change, so the previous block's occupancy is
+  // never kept on screen.
+  useEffect(() => {
+    let active = true;
+
+    // Room still loading, or the room has no valid block.
+    if (!id || !isoDate || !selectedTime) return () => { active = false; };
+
+    const loadOccupancy = async () => {
+      setOccupancyLoading(true);
+      setReservedSeats([]); // drop the previous block's seats at once
+      setSelectedSeat(null); // a seat selection belongs to one block only
+      setReserveError('');
+      try {
+        const reservationsUrl =
+          `${API_BASE_URL}/api/reservations?readingRoom=${encodeURIComponent(id)}` +
+          `&date=${isoDate}&time=${encodeURIComponent(selectedTime)}`;
+        const reservationsResponse = await fetch(reservationsUrl);
+        if (!reservationsResponse.ok) {
+          throw new Error(`Server responded with status ${reservationsResponse.status}`);
+        }
+        const reservationsData = await reservationsResponse.json();
+        const reservations: ReservationSummary[] = Array.isArray(
+          reservationsData.reservations
+        )
+          ? reservationsData.reservations
+          : [];
+        const taken = reservations
+          .filter((item) => item.status === 'active')
+          .map((item) => item.seatNumber);
+        if (active) setReservedSeats(taken);
+      } catch (requestError) {
+        if (!active) return;
+        const detail =
+          requestError instanceof Error ? requestError.message : 'Unknown error';
+        setError(
+          `Could not load seat availability. ${detail}. Please check that the backend server is running.`
+        );
+      } finally {
+        if (active) setOccupancyLoading(false);
+      }
+    };
+
+    loadOccupancy();
+    return () => {
+      active = false;
+    };
+  }, [id, isoDate, selectedTime]);
 
   // Seats actually inside this room's grid (defensive filter).
   const occupiedSeats = room
@@ -175,7 +276,7 @@ export default function SeatAvailabilityScreen() {
 
   // WF-11 — POST the reservation, then go to the WF-12 confirmation screen.
   const handleReserve = async () => {
-    if (selectedSeat === null || !room || !date || !isoDate || !time || saving) {
+    if (selectedSeat === null || !room || !date || !isoDate || !selectedTime || saving) {
       return;
     }
     setSaving(true);
@@ -187,7 +288,7 @@ export default function SeatAvailabilityScreen() {
         body: JSON.stringify({
           readingRoom: room._id,
           date: isoDate,
-          time,
+          time: selectedTime, // the fixed 2-hour block, e.g. "10:00 AM – 12:00 PM"
           seatNumber: selectedSeat,
         }),
       });
@@ -227,7 +328,7 @@ export default function SeatAvailabilityScreen() {
           building: room.building,
           floor: room.floor,
           date,
-          time,
+          time: selectedTime, // fixed 2-hour block shown on WF-12
           seatNumber: String(selectedSeat),
           status: data.status ?? 'active',
         },
@@ -280,15 +381,78 @@ export default function SeatAvailabilityScreen() {
               <Text style={styles.detailLabel}>Selected date</Text>
               <Text style={styles.detailValue}>{date || 'Not selected'}</Text>
             </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Selected time</Text>
-              <Text style={styles.detailValue}>{time || 'Not selected'}</Text>
-            </View>
           </View>
 
-          {/* Seat summary */}
+          {/* Fixed 2-hour time blocks — chosen AFTER the room is known */}
           <View style={styles.card}>
-            <View style={styles.detailRow}>
+            <View style={styles.timeHeaderRow}>
+              <Text style={styles.gridTitle}>Select Time</Text>
+              <Text style={styles.timeHeaderHint}>Fixed 2-hour blocks</Text>
+            </View>
+
+            {timeBlocks.length === 0 ? (
+              <Text style={styles.stateText}>
+                No time blocks available for this room.
+              </Text>
+            ) : (
+              <View style={styles.timeChipGrid}>
+                {Array.from({ length: Math.ceil(timeBlocks.length / 2) }, (_, rowIndex) => (
+                  <View key={rowIndex} style={styles.timeChipRow}>
+                    {timeBlocks.slice(rowIndex * 2, rowIndex * 2 + 2).map((block) => {
+                      const isSelected = selectedTime === block;
+                      return (
+                        <Pressable
+                          key={block}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Time block ${block}`}
+                          accessibilityState={{ selected: isSelected }}
+                          style={[
+                            styles.timeChip,
+                            isSelected && styles.timeChipSelected,
+                          ]}
+                          onPress={() => {
+                            if (block === selectedTime) return;
+                            // Switching blocks: hide the old seat map at once so
+                            // the previous block's occupancy is never shown.
+                            setSelectedTime(block);
+                            setSelectedSeat(null);
+                            setReserveError('');
+                            setReservedSeats([]);
+                            setOccupancyLoading(true);
+                          }}>
+                          <Text
+                            style={[
+                              styles.timeChipText,
+                              isSelected && styles.timeChipSelectedText,
+                            ]}>
+                            {block}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    {rowIndex * 2 + 1 >= timeBlocks.length && (
+                      <View style={styles.timeChipSpacer} />
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
+          {/* Occupancy for the SELECTED block only — never stale data */}
+          {occupancyLoading && (
+            <View style={styles.card}>
+              <ActivityIndicator size="large" color="#1E3A8A" />
+              <Text style={styles.stateText}>Updating seat availability…</Text>
+            </View>
+          )}
+
+          {!occupancyLoading && selectedTime !== null && (
+            <>
+              {/* Seat summary */}
+              <View style={styles.card}>
+                <Text style={styles.gridTitle}>Seat Availability</Text>
+                <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Total seats</Text>
               <Text style={styles.detailValue}>{room.totalSeats}</Text>
             </View>
@@ -384,7 +548,9 @@ export default function SeatAvailabilityScreen() {
             {!saving && reserveError !== '' && (
               <Text style={styles.errorText}>{reserveError}</Text>
             )}
-          </View>
+            </View>
+            </>
+          )}
 
           {/* Guidelines */}
           <View style={styles.infoCard}>
@@ -392,7 +558,8 @@ export default function SeatAvailabilityScreen() {
             <Text style={styles.infoText}>
               Seats are held for 15 minutes after the booking start time. Please keep
               noise to a minimum and carry your Student ID. Occupied seats shown here
-              come from the live reservation list for your selected date and time.
+              come from the live reservation list for your selected date and 2-hour
+              time block.
             </Text>
           </View>
         </>
@@ -523,6 +690,46 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: '#12203F',
+  },
+  timeHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  timeHeaderHint: {
+    fontSize: 12,
+    color: '#7A8199',
+  },
+  timeChipGrid: {
+    gap: 8,
+  },
+  timeChipRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  timeChip: {
+    flex: 1,
+    backgroundColor: '#EEF1F8',
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: '#C9D2E8',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  timeChipSpacer: {
+    flex: 1,
+  },
+  timeChipSelected: {
+    backgroundColor: '#1E3A8A',
+    borderColor: '#1E3A8A',
+  },
+  timeChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1E3A8A',
+  },
+  timeChipSelectedText: {
+    color: '#FFFFFF',
   },
   grid: {
     flexDirection: 'row',
