@@ -5,6 +5,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const managementRoutes = require("./routes/managementRoutes");
+const readingRoomRoutes = require("./routes/readingRoomRoutes");
+const reservationRoutes = require("./routes/reservationRoutes");
 require("dotenv").config();
 
 const app = express();
@@ -13,6 +15,8 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use("/api/management", managementRoutes);
+app.use("/api/reading-rooms", readingRoomRoutes);
+app.use("/api/reservations", reservationRoutes);
 
 // Test route
 app.get("/", (req, res) => {
