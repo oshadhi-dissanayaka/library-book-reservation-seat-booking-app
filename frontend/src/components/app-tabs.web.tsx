@@ -31,16 +31,16 @@ export default function AppTabs() {
           <TabTrigger name="explore" href={"/explore" as any} asChild>
             <TabButton>Explore</TabButton>
           </TabTrigger>
-          <TabTrigger name="reading-rooms" href="/reading-rooms" asChild>
+          <TabTrigger name="reading-rooms" href={"/reading-rooms" as any} asChild>
             <TabButton>Reading Rooms</TabButton>
           </TabTrigger>
-          <TabTrigger name="reservations" href="/reservations" asChild>
+          <TabTrigger name="reservations" href={"/reservations" as any} asChild>
             <TabButton>Reservations</TabButton>
           </TabTrigger>
           {/* Register the route without rendering it in the bottom navigation. */}
           <TabTrigger
             name="notifications"
-            href="/notifications"
+            href={"/notifications" as any}
             style={styles.hiddenRoute}
           />
         </CustomTabList>

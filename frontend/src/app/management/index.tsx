@@ -47,7 +47,16 @@ export default function ManagementLoginScreen() {
           showsVerticalScrollIndicator={false}
         >
           {/* Top Header Section */}
-          <View className="items-center px-6 pt-14">
+          <View className="px-6 pt-12">
+            <Pressable
+              onPress={() => router.replace('/(tabs)' as any)}
+              className="flex-row items-center mb-2 active:opacity-70 self-start"
+            >
+              <Ionicons name="arrow-back" size={20} color="#1E3A8A" />
+              <Text className="ml-1 text-sm font-semibold text-blue-900">Portal Home</Text>
+            </Pressable>
+          </View>
+          <View className="items-center px-6 pt-2">
             {/* Institution Round Icon with small badge */}
             <View className="relative">
               <View className="h-16 w-16 items-center justify-center rounded-full bg-blue-100">

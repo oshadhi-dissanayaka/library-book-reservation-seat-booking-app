@@ -16,6 +16,10 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="staff/index" options={{ headerShown: false }} />
+        <Stack.Screen name="reading-rooms" options={{ headerShown: false }} />
+        <Stack.Screen name="reservations" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications/index" options={{ headerShown: false }} />
+        <Stack.Screen name="management" options={{ headerShown: false }} />
       </Stack>
     </ThemeProvider>
   );

@@ -2,8 +2,8 @@ import Constants from "expo-constants";
 
 const developmentHost = Constants.expoConfig?.hostUri?.split(":")[0];
 const defaultApiUrl = developmentHost
-  ? `http://${developmentHost}:5001/api`
-  : "http://localhost:5001/api";
+  ? `http://${developmentHost}:5000/api`
+  : "http://localhost:5000/api";
 const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || defaultApiUrl).replace(
   /\/+$/,
   ""

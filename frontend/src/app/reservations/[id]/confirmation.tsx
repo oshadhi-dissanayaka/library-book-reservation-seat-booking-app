@@ -118,7 +118,7 @@ export default function ReservationConfirmationScreen() {
         accessibilityRole="button"
         accessibilityLabel="Back to reading rooms"
         style={styles.primaryButton}
-        onPress={() => router.replace('/reading-rooms')}>
+        onPress={() => router.replace('/reading-rooms' as any)}>
         <Text style={styles.primaryButtonText}>BACK TO READING ROOMS</Text>
       </Pressable>
 
@@ -127,14 +127,14 @@ export default function ReservationConfirmationScreen() {
         accessibilityRole="button"
         accessibilityLabel="View my reservations"
         style={styles.secondaryButton}
-        onPress={() => router.push('/reservations')}>
+        onPress={() => router.push('/reservations' as any)}>
         <Text style={styles.secondaryButtonText}>VIEW MY RESERVATIONS</Text>
       </Pressable>
       <Pressable
         accessibilityRole="link"
         accessibilityLabel="View notifications"
         style={styles.linkButton}
-        onPress={() => router.push('/notifications')}>
+        onPress={() => router.push('/notifications' as any)}>
         <Text style={styles.linkText}>View notifications →</Text>
       </Pressable>
     </ScrollView>

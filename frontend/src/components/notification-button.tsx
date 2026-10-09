@@ -18,7 +18,7 @@ export function NotificationButton() {
         { backgroundColor: colors.backgroundElement },
         pressed && styles.pressed,
       ]}
-      onPress={() => router.push('/notifications')}>
+      onPress={() => router.push('/notifications' as any)}>
       <SymbolView
         name={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
         tintColor={colors.text}

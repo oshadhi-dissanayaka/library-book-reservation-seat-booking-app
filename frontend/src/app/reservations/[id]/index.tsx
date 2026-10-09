@@ -142,7 +142,7 @@ export default function ReservationDetailsScreen() {
     if (router.canGoBack()) {
       router.back();
     } else {
-      router.replace('/reservations');
+      router.replace('/reservations' as any);
     }
   };
 

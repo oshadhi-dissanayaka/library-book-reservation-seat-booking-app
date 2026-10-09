@@ -173,7 +173,7 @@ export default function MyReservationsScreen() {
               style={styles.card}
               onPress={() =>
                 router.push({
-                  pathname: '/reservations/[id]',
+                  pathname: '/reservations/[id]' as any,
                   params: { id: reservation._id },
                 })
               }>
