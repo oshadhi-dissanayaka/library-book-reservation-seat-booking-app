@@ -139,7 +139,7 @@ async function fetchOccupiedSeatsForBlocks(
   const reservationLists = await Promise.all(
     blocks.map(async (block) => {
       const reservationsUrl =
-        `${API_BASE_URL}/api/reservations?readingRoom=${encodeURIComponent(roomId)}` +
+        `${API_BASE_URL}/api/seat-reservations?readingRoom=${encodeURIComponent(roomId)}` +
         `&date=${isoDate}&time=${encodeURIComponent(block)}`;
       const response = await fetch(reservationsUrl);
       if (!response.ok) {
@@ -360,7 +360,7 @@ export default function SeatAvailabilityScreen() {
       const createdReservations: CreatedReservation[] = [];
 
       for (const block of selectedTimes) {
-        const response = await fetch(`${API_BASE_URL}/api/reservations`, {
+        const response = await fetch(`${API_BASE_URL}/api/seat-reservations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

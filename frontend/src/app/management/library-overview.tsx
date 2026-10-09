@@ -43,7 +43,7 @@ export default function LibraryOverviewScreen() {
   const loadDashboard = useCallback(async () => {
     try {
       setError('');
-      const response = await fetch(`${API_BASE_URL}/dashboard`);
+      const response = await fetch(`${API_BASE_URL}/management/dashboard`);
       if (!response.ok) throw new Error('Failed to load dashboard');
       const result: DashboardData = await response.json();
       setData(result);

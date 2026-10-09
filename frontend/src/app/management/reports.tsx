@@ -43,7 +43,7 @@ export default function ManagementReportsScreen() {
   // Fetch reports (CRUD: Read)
   const loadReports = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports`);
+      const response = await fetch(`${API_BASE_URL}/management/reports`);
       if (!response.ok) throw new Error('Network error');
       const data = await response.json();
       setReports(data.reports);

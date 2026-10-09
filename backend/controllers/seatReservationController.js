@@ -197,8 +197,37 @@ const getReservations = async (req, res) => {
   } catch (error) {
     console.error("Error fetching reservations:", error);
 
+// DELETE /api/seat-reservations/:id
+const cancelReservation = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({
+        message: "Invalid reservation id",
+      });
+    }
+
+    const reservation = await Reservation.findByIdAndUpdate(
+      id,
+      { status: "cancelled" },
+      { new: true }
+    );
+
+    if (!reservation) {
+      return res.status(404).json({
+        message: "Reservation not found",
+      });
+    }
+
+    return res.status(200).json({
+      message: "Seat reservation cancelled successfully",
+      reservation,
+    });
+  } catch (error) {
+    console.error("Error cancelling reservation:", error);
     return res.status(500).json({
-      message: "Could not load reservations. Please try again.",
+      message: "Could not cancel the reservation. Please try again.",
     });
   }
 };
@@ -206,4 +235,5 @@ const getReservations = async (req, res) => {
 module.exports = {
   createReservation,
   getReservations,
+  cancelReservation,
 };

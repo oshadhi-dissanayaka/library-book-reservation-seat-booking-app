@@ -47,7 +47,7 @@ export default function SeatOccupancyScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/seat-occupancy`);
+      const response = await fetch(`${API_BASE_URL}/management/seat-occupancy`);
       if (!response.ok) throw new Error('Network error');
       const result = await response.json();
       setData(result);

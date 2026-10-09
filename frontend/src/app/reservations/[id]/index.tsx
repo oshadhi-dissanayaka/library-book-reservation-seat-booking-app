@@ -80,6 +80,7 @@ export default function ReservationDetailsScreen() {
   const [reservation, setReservation] = useState<Reservation | null>(null);
   const [room, setRoom] = useState<RoomInfo | null>(null);
   const [loading, setLoading] = useState(true);
+  const [cancelling, setCancelling] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -91,8 +92,8 @@ export default function ReservationDetailsScreen() {
       setReservation(null);
       setRoom(null);
       try {
-        // 1. Reservations (existing STEP-7 endpoint) — pick ours by id.
-        const reservationsResponse = await fetch(`${API_BASE_URL}/api/reservations`);
+        // 1. Seat Reservations endpoint — pick ours by id.
+        const reservationsResponse = await fetch(`${API_BASE_URL}/api/seat-reservations`);
         if (!reservationsResponse.ok) {
           throw new Error(`Server responded with status ${reservationsResponse.status}`);
         }
@@ -260,6 +261,36 @@ export default function ReservationDetailsScreen() {
                 {formatCreated(reservation.createdAt)}
               </Text>
             </View>
+
+            {reservation.status === 'active' && (
+              <View style={{ marginTop: 16 }}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel seat reservation"
+                  style={[styles.cancelButton, cancelling && { opacity: 0.6 }]}
+                  disabled={cancelling}
+                  onPress={async () => {
+                    setCancelling(true);
+                    try {
+                      const res = await fetch(`${API_BASE_URL}/api/seat-reservations/${reservation._id}`, {
+                        method: 'DELETE',
+                      });
+                      if (!res.ok) throw new Error('Cancellation failed');
+                      setReservation((prev) => (prev ? { ...prev, status: 'cancelled' } : null));
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Failed to cancel reservation');
+                    } finally {
+                      setCancelling(false);
+                    }
+                  }}>
+                  {cancelling ? (
+                    <ActivityIndicator color="#B91C1C" size="small" />
+                  ) : (
+                    <Text style={styles.cancelButtonText}>CANCEL RESERVATION</Text>
+                  )}
+                </Pressable>
+              </View>
+            )}
           </View>
         </>
       )}
@@ -391,6 +422,21 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '800',
     color: '#1E3A8A',
+    letterSpacing: 0.5,
+  },
+  cancelButton: {
+    backgroundColor: '#FDECEC',
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#FCA5A5',
+  },
+  cancelButtonText: {
+    color: '#B91C1C',
+    fontSize: 14,
+    fontWeight: '800',
     letterSpacing: 0.5,
   },
 });
