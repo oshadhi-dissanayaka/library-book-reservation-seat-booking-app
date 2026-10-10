@@ -318,7 +318,9 @@ const buildOccupancySnapshot = async () => {
 
     const taken = reservedCount + occupiedCount;
     return {
+      _id: String(room._id),
       name: room.name,
+      building: room.building || "",
       floor: room.floor || "",
       wing: room.zone || "",
       totalSeats: total,
@@ -1131,6 +1133,284 @@ const markReservationNoShow = async (req, res) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// WF-21: Add New Book
+// POST /api/staff/books
+// ---------------------------------------------------------------------------
+const createBook = async (req, res) => {
+  try {
+    const {
+      title,
+      author,
+      edition,
+      isbn,
+      category,
+      shelfLocation,
+      totalCopies,
+      notes,
+      publisher,
+      publicationYear,
+      callNumber,
+      description,
+      staffId,
+    } = req.body;
+
+    if (!title || typeof title !== "string" || !title.trim()) {
+      return res.status(400).json({ success: false, message: "Book title is required." });
+    }
+    if (!author || typeof author !== "string" || !author.trim()) {
+      return res.status(400).json({ success: false, message: "Author is required." });
+    }
+    if (!shelfLocation || typeof shelfLocation !== "string" || !shelfLocation.trim()) {
+      return res.status(400).json({ success: false, message: "Shelf location is required." });
+    }
+
+    const copies = totalCopies !== undefined ? Number(totalCopies) : 1;
+    if (!Number.isInteger(copies) || copies < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Total copies must be a positive integer (at least 1).",
+      });
+    }
+
+    if (isbn && typeof isbn === "string" && isbn.trim()) {
+      const existing = await Book.findOne({ isbn: isbn.trim() });
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          message: `A book with ISBN "${isbn.trim()}" already exists (${existing.title}).`,
+        });
+      }
+    }
+
+    const newBook = await Book.create({
+      title: title.trim(),
+      author: author.trim(),
+      edition:
+        edition && typeof edition === "string" && edition.trim()
+          ? edition.trim()
+          : "1st Edition",
+      isbn:
+        isbn && typeof isbn === "string" && isbn.trim() ? isbn.trim() : undefined,
+      category:
+        category && typeof category === "string" && category.trim()
+          ? category.trim()
+          : "General",
+      shelfLocation: shelfLocation.trim(),
+      shelf: shelfLocation.trim(),
+      totalCopies: copies,
+      availableCopies: copies,
+      status: "Available",
+      notes: notes && typeof notes === "string" ? notes.trim() : "",
+      publisher: publisher ? String(publisher).trim() : undefined,
+      publicationYear: publicationYear ? Number(publicationYear) : undefined,
+      callNumber: callNumber ? String(callNumber).trim() : undefined,
+      description: description ? String(description).trim() : undefined,
+    });
+
+    await logAction(
+      staffId || configuredStaffUsername,
+      "CREATE_BOOK",
+      "BOOK",
+      newBook.title,
+      `Created new book "${newBook.title}" by ${newBook.author} with ${newBook.totalCopies} copies at ${newBook.shelfLocation}`
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `Book "${newBook.title}" added successfully.`,
+      data: newBook,
+    });
+  } catch (error) {
+    if (error && error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: Object.values(error.errors)[0].message,
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add new book",
+      error: error.message,
+    });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// WF-22: Add New Reading Room
+// POST /api/staff/reading-rooms
+// ---------------------------------------------------------------------------
+const createReadingRoom = async (req, res) => {
+  try {
+    const {
+      name,
+      building,
+      floor,
+      zone,
+      description,
+      openingTime,
+      closingTime,
+      totalSeats,
+      status,
+      staffId,
+    } = req.body;
+
+    if (!name || typeof name !== "string" || !name.trim()) {
+      return res.status(400).json({ success: false, message: "Room name is required." });
+    }
+    if (!building || typeof building !== "string" || !building.trim()) {
+      return res.status(400).json({ success: false, message: "Building is required." });
+    }
+    if (!floor || typeof floor !== "string" || !floor.trim()) {
+      return res.status(400).json({ success: false, message: "Floor is required." });
+    }
+
+    const seats = totalSeats !== undefined ? Number(totalSeats) : 20;
+    if (!Number.isInteger(seats) || seats < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Total seats must be a whole number of at least 1.",
+      });
+    }
+
+    const timeRegex = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
+    const openTime =
+      openingTime && typeof openingTime === "string" ? openingTime.trim() : "08:00";
+    const closeTime =
+      closingTime && typeof closingTime === "string" ? closingTime.trim() : "18:30";
+
+    if (!timeRegex.test(openTime)) {
+      return res.status(400).json({
+        success: false,
+        message: "Opening time must be 24-hour HH:mm (e.g. 08:00).",
+      });
+    }
+    if (!timeRegex.test(closeTime)) {
+      return res.status(400).json({
+        success: false,
+        message: "Closing time must be 24-hour HH:mm (e.g. 18:30).",
+      });
+    }
+    if (closeTime <= openTime) {
+      return res.status(400).json({
+        success: false,
+        message: "Closing time must be later than opening time.",
+      });
+    }
+
+    const existing = await ReadingRoom.findOne({
+      name: name.trim(),
+      building: building.trim(),
+      floor: floor.trim(),
+    });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: `A reading room with name "${name.trim()}" already exists on ${floor.trim()} of ${building.trim()}.`,
+      });
+    }
+
+    const room = await ReadingRoom.create({
+      name: name.trim(),
+      building: building.trim(),
+      floor: floor.trim(),
+      zone: zone && typeof zone === "string" && zone.trim() ? zone.trim() : "General",
+      description: description && typeof description === "string" ? description.trim() : "",
+      openingTime: openTime,
+      closingTime: closeTime,
+      totalSeats: seats,
+      status:
+        status && ["active", "inactive", "maintenance"].includes(status)
+          ? status
+          : "active",
+    });
+
+    await logAction(
+      staffId || configuredStaffUsername,
+      "CREATE_READING_ROOM",
+      "SYSTEM",
+      room.name,
+      `Created reading room "${room.name}" in ${room.building} (${room.floor}) with ${room.totalSeats} seats`
+    );
+
+    return res.status(201).json({
+      success: true,
+      message: `Reading room "${room.name}" added successfully.`,
+      data: room,
+    });
+  } catch (error) {
+    if (error && error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: Object.values(error.errors)[0].message,
+      });
+    }
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add reading room",
+      error: error.message,
+    });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// WF-22: Add Seats to Existing Reading Room
+// POST /api/staff/reading-rooms/:id/seats
+// ---------------------------------------------------------------------------
+const addSeatsToRoom = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { additionalSeats, staffId } = req.body;
+
+    const count = Number(additionalSeats);
+    if (!Number.isInteger(count) || count < 1) {
+      return res.status(400).json({
+        success: false,
+        message: "Additional seats must be a positive integer (at least 1).",
+      });
+    }
+
+    let room = null;
+    if (mongoose.isValidObjectId(id)) {
+      room = await ReadingRoom.findById(id);
+    }
+    if (!room) {
+      room = await ReadingRoom.findOne({ name: id });
+    }
+
+    if (!room) {
+      return res.status(404).json({
+        success: false,
+        message: `Reading room not found for identifier "${id}".`,
+      });
+    }
+
+    const previousTotal = room.totalSeats;
+    room.totalSeats = previousTotal + count;
+    await room.save();
+
+    await logAction(
+      staffId || configuredStaffUsername,
+      "ADD_ROOM_SEATS",
+      "SEAT",
+      room.name,
+      `Added ${count} seats to "${room.name}". Total capacity increased from ${previousTotal} to ${room.totalSeats}.`
+    );
+
+    return res.status(200).json({
+      success: true,
+      message: `Added ${count} seats to "${room.name}". New total seats: ${room.totalSeats}.`,
+      data: room,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Failed to add seats to reading room",
+      error: error.message,
+    });
+  }
+};
+
 module.exports = {
   loginStaff,
   getStaffDashboard,
@@ -1140,8 +1420,11 @@ module.exports = {
   rejectReservation,
   getBooks,
   updateBookAvailability,
+  createBook,
   getOccupancy,
   updateSeatStatus,
+  createReadingRoom,
+  addSeatsToRoom,
   getNoShowsAndCancellations,
   markReservationNoShow,
 };

@@ -4,6 +4,7 @@ import {
   FlatList,
   Modal,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -38,6 +39,81 @@ export const BookAvailabilityManagementScreen: React.FC<
   const [editShelf, setEditShelf] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [updating, setUpdating] = useState(false);
+
+  // Add Book state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newAuthor, setNewAuthor] = useState('');
+  const [newEdition, setNewEdition] = useState('1st Edition');
+  const [newIsbn, setNewIsbn] = useState('');
+  const [newCategory, setNewCategory] = useState('General');
+  const [newShelf, setNewShelf] = useState('');
+  const [newCopies, setNewCopies] = useState<number>(1);
+  const [newNotes, setNewNotes] = useState('');
+  const [addingBook, setAddingBook] = useState(false);
+  const [addModalError, setAddModalError] = useState('');
+
+  const resetAddForm = () => {
+    setNewTitle('');
+    setNewAuthor('');
+    setNewEdition('1st Edition');
+    setNewIsbn('');
+    setNewCategory('General');
+    setNewShelf('');
+    setNewCopies(1);
+    setNewNotes('');
+    setAddModalError('');
+  };
+
+  const handleAddBook = async () => {
+    if (!newTitle.trim()) {
+      setAddModalError('Book title is required.');
+      return;
+    }
+    if (!newAuthor.trim()) {
+      setAddModalError('Author is required.');
+      return;
+    }
+    if (!newShelf.trim()) {
+      setAddModalError('Shelf location is required (e.g. Main Library • Shelf A12).');
+      return;
+    }
+    if (newCopies < 1) {
+      setAddModalError('Total copies must be at least 1.');
+      return;
+    }
+
+    setAddingBook(true);
+    setAddModalError('');
+
+    try {
+      const res = await staffApi.createBook({
+        title: newTitle.trim(),
+        author: newAuthor.trim(),
+        edition: newEdition.trim() || '1st Edition',
+        isbn: newIsbn.trim() || undefined,
+        category: newCategory.trim() || 'General',
+        shelfLocation: newShelf.trim(),
+        totalCopies: newCopies,
+        notes: newNotes.trim() || undefined,
+        staffId,
+      });
+
+      if (res.success && res.data) {
+        setIsAddModalOpen(false);
+        resetAddForm();
+        setFeedback(`Book "${res.data.title}" added to catalog.`);
+        setTimeout(() => setFeedback(''), 3500);
+        fetchBooks();
+      } else {
+        setAddModalError(res.message || 'Failed to add book.');
+      }
+    } catch {
+      setAddModalError('Failed to add book. Please check server connection.');
+    } finally {
+      setAddingBook(false);
+    }
+  };
 
   const fetchBooks = async () => {
     try {
@@ -147,6 +223,15 @@ export const BookAvailabilityManagementScreen: React.FC<
         <Text style={styles.counterText}>
           CATALOG TITLES ({books.length})
         </Text>
+        <TouchableOpacity
+          style={styles.addBookBtn}
+          onPress={() => {
+            resetAddForm();
+            setIsAddModalOpen(true);
+          }}
+          activeOpacity={0.8}>
+          <Text style={styles.addBookBtnText}>+ Add Book</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -306,6 +391,134 @@ export const BookAvailabilityManagementScreen: React.FC<
           </View>
         </View>
       </Modal>
+
+      {/* Add New Book Modal */}
+      <Modal
+        visible={isAddModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsAddModalOpen(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.editorSheet, { maxHeight: '85%' }]}>
+            <Text style={styles.sheetTitle}>Add New Book</Text>
+            <Text style={styles.sheetSub}>Enter book details for the library catalog</Text>
+
+            {addModalError ? (
+              <View style={styles.modalErrorBox}>
+                <Text style={styles.modalErrorText}>⚠️ {addModalError}</Text>
+              </View>
+            ) : null}
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Title Input */}
+              <Text style={styles.fieldLabel}>BOOK TITLE *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newTitle}
+                onChangeText={setNewTitle}
+                placeholder="e.g. Operating System Concepts"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Author Input */}
+              <Text style={styles.fieldLabel}>AUTHOR(S) *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newAuthor}
+                onChangeText={setNewAuthor}
+                placeholder="e.g. Silberschatz, Galvin & Gagne"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Shelf Location Input */}
+              <Text style={styles.fieldLabel}>SHELF LOCATION *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newShelf}
+                onChangeText={setNewShelf}
+                placeholder="e.g. Main Library • Shelf C04"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Total Copies */}
+              <Text style={styles.fieldLabel}>TOTAL COPIES</Text>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setNewCopies(Math.max(1, newCopies - 1))}>
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.stepperValue}>{newCopies}</Text>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setNewCopies(newCopies + 1)}>
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Edition Input */}
+              <Text style={styles.fieldLabel}>EDITION</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newEdition}
+                onChangeText={setNewEdition}
+                placeholder="e.g. 1st Edition"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* ISBN Input */}
+              <Text style={styles.fieldLabel}>ISBN</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newIsbn}
+                onChangeText={setNewIsbn}
+                placeholder="e.g. 978-1118063330"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Category Input */}
+              <Text style={styles.fieldLabel}>CATEGORY</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newCategory}
+                onChangeText={setNewCategory}
+                placeholder="e.g. Computer Science"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Notes Input */}
+              <Text style={styles.fieldLabel}>STAFF / CATALOG NOTE</Text>
+              <TextInput
+                style={[styles.inputField, { minHeight: 50 }]}
+                value={newNotes}
+                onChangeText={setNewNotes}
+                placeholder="e.g. Core reference text"
+                placeholderTextColor={staffTheme.placeholder}
+                multiline
+              />
+
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleAddBook}
+                disabled={addingBook}
+                activeOpacity={0.8}>
+                {addingBook ? (
+                  <ActivityIndicator color={staffTheme.white} />
+                ) : (
+                  <Text style={styles.saveBtnText}>SAVE NEW BOOK</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setIsAddModalOpen(false)}
+                disabled={addingBook}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -368,6 +581,9 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   counterRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
@@ -609,6 +825,28 @@ const styles = StyleSheet.create({
   cancelBtnText: {
     color: staffTheme.muted,
     fontSize: 13,
+    fontWeight: '700',
+  },
+  addBookBtn: {
+    backgroundColor: staffTheme.navy,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  addBookBtnText: {
+    color: staffTheme.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  modalErrorBox: {
+    backgroundColor: staffTheme.paleRed,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  modalErrorText: {
+    color: staffTheme.red,
+    fontSize: 12,
     fontWeight: '700',
   },
 });

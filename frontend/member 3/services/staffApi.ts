@@ -1,5 +1,8 @@
 import {
+  AddSeatsPayload,
   Book,
+  CreateBookPayload,
+  CreateReadingRoomPayload,
   NoShowsSummaryData,
   ReadingRoomInfo,
   Reservation,
@@ -626,6 +629,54 @@ export const staffApi = {
   },
 
   /**
+   * Add New Book to Library Catalog (WF-21)
+   */
+  async createBook(payload: CreateBookPayload): Promise<{
+    success: boolean;
+    message?: string;
+    data?: Book;
+  }> {
+    const result = await request<{ success: boolean; message?: string; data: Book }>(
+      '/books',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
+    }
+
+    if (DEMO_MODE) {
+      const newBook: Book = {
+        _id: `b-${Date.now()}`,
+        title: payload.title,
+        author: payload.author,
+        edition: payload.edition || '1st Edition',
+        isbn: payload.isbn,
+        category: payload.category || 'General',
+        shelfLocation: payload.shelfLocation,
+        totalCopies: payload.totalCopies,
+        availableCopies: payload.totalCopies,
+        status: 'Available',
+        notes: payload.notes || '',
+      };
+      FALLBACK_BOOKS.unshift(newBook);
+      return {
+        success: true,
+        message: `Book "${newBook.title}" added successfully.`,
+        data: newBook,
+      };
+    }
+
+    return {
+      success: false,
+      message: result.message || 'Failed to add new book.',
+    };
+  },
+
+  /**
    * Reading Room Floor Occupancy & Seat Map (WF-22)
    */
   async getOccupancy(): Promise<{
@@ -680,6 +731,97 @@ export const staffApi = {
       return { success: true, message: `Seat status updated to ${status}` };
     }
     return { success: false, message: result.message };
+  },
+
+  /**
+   * Add New Reading Room (WF-22)
+   */
+  async createReadingRoom(payload: CreateReadingRoomPayload): Promise<{
+    success: boolean;
+    message?: string;
+    data?: ReadingRoomInfo;
+  }> {
+    const result = await request<{
+      success: boolean;
+      message?: string;
+      data: ReadingRoomInfo;
+    }>('/reading-rooms', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (result.ok && result.body?.success) {
+      return result.body;
+    }
+
+    if (DEMO_MODE) {
+      const newRoom: ReadingRoomInfo = {
+        name: payload.name,
+        floor: payload.floor,
+        wing: payload.zone || 'General',
+        totalSeats: payload.totalSeats,
+        occupiedSeats: 0,
+        availableSeats: payload.totalSeats,
+        occupancyRate: 0,
+        seats: [],
+      };
+      FALLBACK_OCCUPANCY_ROOMS.push(newRoom);
+      return {
+        success: true,
+        message: `Reading room "${newRoom.name}" added successfully.`,
+        data: newRoom,
+      };
+    }
+
+    return {
+      success: false,
+      message: result.message || 'Failed to add reading room.',
+    };
+  },
+
+  /**
+   * Add Seats to Existing Reading Room (WF-22)
+   */
+  async addSeatsToRoom(
+    roomIdOrName: string,
+    additionalSeats: number,
+    staffId?: string
+  ): Promise<{
+    success: boolean;
+    message?: string;
+    data?: any;
+  }> {
+    const result = await request<{
+      success: boolean;
+      message?: string;
+      data: any;
+    }>(`/reading-rooms/${encodeURIComponent(roomIdOrName)}/seats`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ additionalSeats, staffId }),
+    });
+    if (result.ok && result.body?.success) {
+      return result.body;
+    }
+
+    if (DEMO_MODE) {
+      const room = FALLBACK_OCCUPANCY_ROOMS.find(
+        (r) => r.name === roomIdOrName || r._id === roomIdOrName
+      );
+      if (room) {
+        room.totalSeats += additionalSeats;
+        room.availableSeats += additionalSeats;
+      }
+      return {
+        success: true,
+        message: `Added ${additionalSeats} seats to room.`,
+      };
+    }
+
+    return {
+      success: false,
+      message: result.message || 'Failed to add seats to reading room.',
+    };
   },
 
   /**
