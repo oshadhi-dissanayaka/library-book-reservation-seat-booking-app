@@ -11,6 +11,7 @@ require("dotenv").config({
 });
 
 // Routes
+const authRoutes = require("./routes/authRoutes");
 const managementRoutes = require("./routes/managementRoutes");
 const bookRoutes = require("./routes/bookRoutes");
 const reservationRoutes = require("./routes/reservationRoutes");
@@ -25,6 +26,9 @@ app.use(cors());
 app.use(express.json());
 
 // API Routes
+
+// Authentication (signup / login / me) for all portals
+app.use("/api/auth", authRoutes);
 
 // Member 4 - Management & Reports
 app.use("/api/management", managementRoutes);

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -14,23 +14,54 @@ import {
   View,
 } from 'react-native';
 
+import { signIn } from '@/lib/auth-api';
+import { loadAuthSession } from '@/lib/auth-session';
+
 export default function ManagementLoginScreen() {
-  const [username, setUsername] = useState('MGT-4011');
-  const [password, setPassword] = useState('password123');
+  const [institutionalId, setInstitutionalId] = useState('');
+  const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleLogin = () => {
-    if (!username.trim() || !password.trim()) {
-      Alert.alert('Required', 'Please enter your Username / Staff ID and Password.');
+  // Already signed in as management -> skip the login form.
+  useEffect(() => {
+    let mounted = true;
+    void loadAuthSession().then((session) => {
+      if (mounted && session?.user.role === 'management') {
+        router.replace('/management/library-overview');
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleLogin = async () => {
+    if (!institutionalId.trim() || !password) {
+      setError('Please enter your Management ID and Password.');
       return;
     }
 
     setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
+    setError('');
+    try {
+      // Real backend validation: correct ID + password + role "management".
+      await signIn({
+        institutionalId: institutionalId.trim(),
+        password,
+        role: 'management',
+      });
       router.replace('/management/library-overview');
-    }, 600);
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : 'Unable to sign in. Please try again.'
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -109,22 +140,25 @@ export default function ManagementLoginScreen() {
 
           {/* Form Section */}
           <View className="px-6 pt-6">
-            {/* Username / Staff ID */}
+            {/* Management ID */}
             <View className="mb-4">
               <View className="flex-row justify-between">
                 <Text className="mb-1.5 text-xs font-semibold text-slate-800">
-                  Username / Staff ID
+                  Management ID
                 </Text>
                 <Text className="text-xs font-medium text-blue-800">Required</Text>
               </View>
               <View className="flex-row items-center rounded-2xl border border-slate-200 bg-slate-50/80 px-4 py-3.5">
                 <Ionicons name="id-card-outline" size={18} color="#64748B" />
                 <TextInput
-                  value={username}
-                  onChangeText={setUsername}
-                  placeholder="e.g. MGT-4011"
+                  value={institutionalId}
+                  onChangeText={(value) => {
+                    setInstitutionalId(value);
+                    if (error) setError('');
+                  }}
+                  placeholder="e.g. MGT001"
                   placeholderTextColor="#94A3B8"
-                  autoCapitalize="none"
+                  autoCapitalize="characters"
                   className="ml-3 flex-1 text-sm font-medium text-slate-900"
                 />
               </View>
@@ -153,7 +187,10 @@ export default function ManagementLoginScreen() {
                 <Ionicons name="lock-closed-outline" size={18} color="#64748B" />
                 <TextInput
                   value={password}
-                  onChangeText={setPassword}
+                  onChangeText={(value) => {
+                    setPassword(value);
+                    if (error) setError('');
+                  }}
                   placeholder="••••••••••••"
                   placeholderTextColor="#94A3B8"
                   secureTextEntry={!showPassword}
@@ -169,6 +206,14 @@ export default function ManagementLoginScreen() {
                 </Pressable>
               </View>
             </View>
+
+            {/* Sign-in error */}
+            {error ? (
+              <View className="mb-3 flex-row items-center rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                <Ionicons name="alert-circle-outline" size={16} color="#B91C1C" />
+                <Text className="ml-2 flex-1 text-xs font-medium text-red-700">{error}</Text>
+              </View>
+            ) : null}
 
             {/* Login Button */}
             <Pressable
@@ -197,7 +242,7 @@ export default function ManagementLoginScreen() {
             <View className="mt-6 flex-row items-start rounded-2xl bg-blue-50/60 p-4">
               <Ionicons name="school" size={20} color="#1E3A8A" />
               <Text className="ml-3 flex-1 text-[11px] leading-5 text-slate-600">
-                Use your central university library management credentials to proceed to daily analytics and occupancy metrics.
+                Use your central university library management credentials to proceed to daily analytics and occupancy metrics. Management accounts are issued by the University - there is no public sign-up for this portal.
               </Text>
             </View>
 

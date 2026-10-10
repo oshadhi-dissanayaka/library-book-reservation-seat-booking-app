@@ -25,7 +25,7 @@ import {
 // Backend address — shared API configuration (src/lib/api.ts): the Expo
 // dev-server host (works on a physical phone) and the backend's port 5000.
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
-import { CURRENT_STUDENT_ID, studentIdQuery } from '@/lib/student-identity';
+import { currentStudentId, studentIdQuery } from '@/lib/student-identity';
 
 type Reservation = {
   _id: string;
@@ -196,7 +196,7 @@ export default function ReservationDetailsScreen() {
         {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ studentId: CURRENT_STUDENT_ID }),
+          body: JSON.stringify({ studentId: currentStudentId() }),
         }
       );
 

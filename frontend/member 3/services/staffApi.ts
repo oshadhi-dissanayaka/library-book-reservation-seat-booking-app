@@ -336,7 +336,9 @@ const FALLBACK_OCCUPANCY_ROOMS: ReadingRoomInfo[] = [
 
 export const staffApi = {
   /**
-   * Staff Authentication (WF-16)
+   * Staff Authentication (WF-16) - always real backend validation
+   * (UserAccount, role: library_staff, bcrypt). There is intentionally NO
+   * demo-mode shortcut here: wrong credentials must fail.
    */
   async login(username: string, password: string): Promise<LoginResponse> {
     const result = await request<LoginResponse>('/login', {
@@ -347,25 +349,6 @@ export const staffApi = {
 
     if (result.ok && result.body?.success) {
       return result.body;
-    }
-
-    if (DEMO_MODE) {
-      // Explicit demo credential check — mirrors the backend rule so demo
-      // mode still rejects wrong credentials.
-      if (username.trim().toUpperCase() !== 'STF-4092' || password !== 'staff-demo') {
-        return { success: false, message: 'Invalid Staff ID or password.' };
-      }
-      return {
-        success: true,
-        data: {
-          staffId: 'STF-4092',
-          name: 'Circulation Desk Officer',
-          role: 'Library Staff',
-          desk: 'Circulation Desk 01',
-          shift: '08:00 - 17:00',
-          token: 'local-staff-token',
-        },
-      };
     }
 
     return {

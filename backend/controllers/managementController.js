@@ -289,10 +289,139 @@ const getManagementReports = async (req, res) => {
   }
 };
 
+// ---------------------------------------------------------------------------
+// Library Staff account management (University Management only).
+// Management can list and create library_staff accounts - never students,
+// academic staff, or other management users.
+// ---------------------------------------------------------------------------
+const UserAccount = require("../models/UserAccount");
+const {
+  hashPassword,
+  passwordPolicyError,
+  generateTemporaryPassword,
+} = require("./authController");
+
+/**
+ * GET /api/management/library-staff
+ * Safe projection only - passwordHash is never selected (schema select:false).
+ */
+const listLibraryStaff = async (req, res) => {
+  try {
+    const staff = await UserAccount.find({ role: "library_staff" }).sort({ createdAt: -1 });
+    return res.status(200).json({
+      staff: staff.map((account) => account.toSafeObject()),
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to load library staff accounts." });
+  }
+};
+
+/**
+ * POST /api/management/library-staff
+ * Creates one active library_staff account with a hashed temporary password
+ * (and mustChangePassword = true).
+ */
+const createLibraryStaff = async (req, res) => {
+  try {
+    const institutionalId = String(req.body.institutionalId || req.body.staffId || "")
+      .trim()
+      .toUpperCase();
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const name = String(req.body.name || "").trim();
+    let temporaryPassword = String(req.body.password || req.body.temporaryPassword || "").trim();
+    const generatedPassword = temporaryPassword === "";
+
+    if (!institutionalId || !email || !name) {
+      return res.status(400).json({
+        message: "Staff ID, name and university email are required.",
+      });
+    }
+    if (!/^[A-Z0-9-]{3,}$/.test(institutionalId)) {
+      return res.status(400).json({
+        message: "Staff ID must be at least 3 characters of letters, numbers or dashes.",
+      });
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ message: "Enter a valid university email address." });
+    }
+
+    if (generatedPassword) {
+      temporaryPassword = generateTemporaryPassword();
+    }
+
+    const policyError = passwordPolicyError(temporaryPassword);
+    if (policyError) {
+      return res.status(400).json({ message: policyError });
+    }
+
+    const duplicate = await UserAccount.findOne({
+      $or: [{ institutionalId }, { email }],
+    });
+    if (duplicate) {
+      if (duplicate.institutionalId === institutionalId) {
+        return res.status(409).json({ message: "A user with this Staff ID already exists." });
+      }
+      return res.status(409).json({ message: "A user with this email already exists." });
+    }
+
+    const passwordHash = await hashPassword(temporaryPassword);
+    const account = await UserAccount.create({
+      institutionalId,
+      email,
+      name,
+      role: "library_staff", // role is forced - never taken from the request
+      passwordHash,
+      active: true,
+      mustChangePassword: true,
+    });
+
+    const payload = { staff: account.toSafeObject() };
+    if (generatedPassword) {
+      // Shown once so management can hand the temporary password to the staff
+      // member. Only returned for passwords the backend generated.
+      payload.temporaryPassword = temporaryPassword;
+    }
+    return res.status(201).json(payload);
+  } catch (error) {
+    if (error && error.code === 11000) {
+      return res.status(409).json({ message: "A user with this Staff ID or email already exists." });
+    }
+    return res.status(500).json({ message: "Failed to create the library staff account." });
+  }
+};
+
+/**
+ * PATCH /api/management/library-staff/:institutionalId/status
+ * { active: true | false } - deactivate / reactivate a library staff account.
+ */
+const setLibraryStaffStatus = async (req, res) => {
+  try {
+    const institutionalId = String(req.params.institutionalId || "").trim().toUpperCase();
+    if (typeof req.body.active !== "boolean") {
+      return res.status(400).json({ message: "active must be true or false." });
+    }
+
+    const account = await UserAccount.findOne({ institutionalId, role: "library_staff" });
+    if (!account) {
+      return res.status(404).json({ message: "Library staff account not found." });
+    }
+
+    account.active = req.body.active;
+    await account.save();
+
+    return res.status(200).json({ staff: account.toSafeObject() });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update the library staff account." });
+  }
+};
+
 module.exports = {
   getDashboard,
   getBookUsageReport,
   getReservationAnalytics,
   getSeatOccupancyReport,
   getManagementReports,
+  listLibraryStaff,
+  createLibraryStaff,
+  setLibraryStaffStatus,
 };

@@ -101,6 +101,9 @@ export interface StaffUser {
   desk: string;
   shift: string;
   token?: string;
+  /** University email on the underlying UserAccount (real logins only). */
+  email?: string;
+  mustChangePassword?: boolean;
 }
 
 export interface StaffDashboardData {

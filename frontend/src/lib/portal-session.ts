@@ -1,23 +1,28 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import { CURRENT_STUDENT_ID } from '@/lib/student-identity';
+import {
+  clearAuthSession,
+  loadAuthSession,
+} from '@/lib/auth-session';
+import { currentStudentId } from '@/lib/student-identity';
 
 /**
- * Lightweight student/academic-staff portal session (assignment-safe dev
- * identity — there is no real authentication backend in this milestone).
+ * Portal session adapter.
  *
- * The `id` is ALWAYS the shared development identity from
- * src/lib/student-identity.ts so every Member 2 screen (WF-09–WF-15)
- * keeps working unchanged. `role` only affects the greeting/labels — it
- * never sends Academic Staff to the Library Staff (/staff) interface.
+ * Authentication itself now lives in src/lib/auth-session.ts (JWT + user from
+ * the backend). This module keeps the pre-existing API used by the Home screen
+ * and the splash/onboarding flow so no Member 1-4 screen had to change shape:
  *
- * Keys (AsyncStorage):
- *   libconnect_onboarding_complete = "true"  — onboarding was seen
- *   libconnect_portal_session      = {"id","displayName","role"}
+ *   getPortalSession()    -> the signed-in student/academic-staff identity
+ *   clearPortalSession()  -> sign out (clears the auth session)
+ *   portalBackendId()     -> the patron/student id stamped on reservations
+ *                            (authenticated institutional id when signed in,
+ *                             else the legacy shared dev identity)
+ *
+ * Onboarding flags (libconnect_onboarding_complete) still live here.
  */
 
 const ONBOARDING_KEY = 'libconnect_onboarding_complete';
-const SESSION_KEY = 'libconnect_portal_session';
 
 export type PortalRole = 'student' | 'academic_staff';
 
@@ -44,7 +49,7 @@ export async function setOnboardingComplete(): Promise<void> {
   }
 }
 
-/** Dev helper — clears the onboarding flag (see the splash screen's dev tap). */
+/** Dev helper - clears the onboarding flag (see the splash screen's dev tap). */
 export async function resetOnboarding(): Promise<void> {
   try {
     await AsyncStorage.removeItem(ONBOARDING_KEY);
@@ -54,60 +59,33 @@ export async function resetOnboarding(): Promise<void> {
 }
 
 /**
- * Reads the saved portal session. Returns `null` for a MISSING, CORRUPT, or
- * malformed value so the launch flow safely falls back to /portal. A session
- * only counts as valid when it holds a non-empty string `id` and
- * `displayName`; an unknown `role` is coerced to 'student'.
+ * The signed-in student/academic-staff session, or null when nobody is signed
+ * in (or a privileged staff/management session is active instead).
  */
 export async function getPortalSession(): Promise<PortalSession | null> {
-  try {
-    const raw = await AsyncStorage.getItem(SESSION_KEY);
-    if (!raw) return null;
-
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      return null; // corrupt / non-JSON payload -> /portal
-    }
-
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null;
-
-    const record = parsed as Record<string, unknown>;
-    if (typeof record.id !== 'string' || record.id.length === 0) return null;
-    if (typeof record.displayName !== 'string' || record.displayName.length === 0) return null;
-
-    return {
-      id: record.id,
-      displayName: record.displayName,
-      role: record.role === 'academic_staff' ? 'academic_staff' : 'student',
-    };
-  } catch {
-    return null; // storage read failure -> /portal
-  }
+  const session = await loadAuthSession();
+  if (!session) return null;
+  const { user } = session;
+  if (user.role !== 'student' && user.role !== 'academic_staff') return null;
+  if (!user.institutionalId) return null;
+  return {
+    id: user.institutionalId,
+    displayName: user.name || user.institutionalId,
+    role: user.role,
+  };
 }
 
-export async function savePortalSession(session: PortalSession): Promise<void> {
-  try {
-    await AsyncStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  } catch {
-    // The session simply won't persist; the user can sign in again.
-  }
-}
-
+/** Sign out - clears the stored auth session (token + user). */
 export async function clearPortalSession(): Promise<void> {
-  try {
-    await AsyncStorage.removeItem(SESSION_KEY);
-  } catch {
-    // Ignore storage failures on sign-out.
-  }
+  await clearAuthSession();
 }
 
 /**
- * The backend patron/student id stamped on seat reservations. Both portal
- * roles share the ONE configured dev identity so WF-09–WF-15 (which query
- * by CURRENT_STUDENT_ID) always see the reservations made from Home.
+ * The backend patron/student id stamped on reservations. The authenticated
+ * institutional id is used whenever a user is signed in, so seat and book
+ * reservations always belong to the signed-in student/academic staff member.
+ * Falls back to the legacy shared dev identity only when signed out.
  */
 export function portalBackendId(): string {
-  return CURRENT_STUDENT_ID;
+  return currentStudentId();
 }

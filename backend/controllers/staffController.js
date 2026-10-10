@@ -1,29 +1,29 @@
 const mongoose = require("mongoose");
+const bcrypt = require("bcryptjs");
 const Book = require("../models/Book");
 const ReadingRoom = require("../models/ReadingRoom");
 const Reservation = require("../models/Reservation");
 const Seat = require("../models/Seat");
 const SeatReservation = require("../models/SeatReservation");
 const StaffLog = require("../models/StaffLog");
+const UserAccount = require("../models/UserAccount");
+const { signToken } = require("../middleware/auth");
 const {
   findReservationWithHold,
   applyTerminalStatus,
 } = require("../services/reservationLifecycle");
 
 // ---------------------------------------------------------------------------
-// Staff login credentials (WF-16)
-// Environment-backed demo credentials — no Staff collection exists for this
-// prototype. Override in backend/.env:  STAFF_USERNAME=...  STAFF_PASSWORD=...
+// Staff login (WF-16) authenticates against the real UserAccount collection
+// (role: library_staff, bcrypt hash). Library Staff accounts are issued by
+// University Management - there is no public staff self-signup.
+//
+// `configuredStaffUsername` is ONLY the fallback id used in audit-log rows
+// when a caller does not pass an explicit staffId.
 // ---------------------------------------------------------------------------
-const DEFAULT_STAFF_USERNAME = "STF-4092";
-const DEFAULT_STAFF_PASSWORD = "staff-demo"; // documented demo credential
-
-const configuredStaffUsername = (
-  process.env.STAFF_USERNAME || DEFAULT_STAFF_USERNAME
-)
+const configuredStaffUsername = (process.env.STAFF_USERNAME || "LIB001")
   .trim()
   .toUpperCase();
-const configuredStaffPassword = process.env.STAFF_PASSWORD || DEFAULT_STAFF_PASSWORD;
 
 // Helper to log staff actions
 const logAction = async (staffId, action, targetType, targetId, details, status = "SUCCESS") => {
@@ -343,7 +343,9 @@ const buildOccupancySnapshot = async () => {
 // ---------------------------------------------------------------------------
 const loginStaff = async (req, res) => {
   try {
-    const username = String(req.body.username || "").trim();
+    const username = String(req.body.username || req.body.institutionalId || "")
+      .trim()
+      .toUpperCase();
     const password = String(req.body.password || "");
 
     if (!username || !password) {
@@ -353,23 +355,43 @@ const loginStaff = async (req, res) => {
       });
     }
 
-    if (
-      username.toUpperCase() !== configuredStaffUsername ||
-      password !== configuredStaffPassword
-    ) {
+    const account = await UserAccount.findOne({
+      institutionalId: username,
+      role: "library_staff",
+    }).select("+passwordHash");
+
+    // Same failure message whether the ID is unknown or the password is wrong.
+    if (!account) {
       return res.status(401).json({
         success: false,
         message: "Invalid Staff ID or password.",
       });
     }
 
+    const validPassword = await bcrypt.compare(password, account.passwordHash);
+    if (!validPassword) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid Staff ID or password.",
+      });
+    }
+
+    if (!account.active) {
+      return res.status(403).json({
+        success: false,
+        message: "This account is inactive. Contact University Management.",
+      });
+    }
+
     const staffUser = {
-      staffId: configuredStaffUsername,
-      name: "Bandaranayaka LAMMM (Staff Ops)",
+      staffId: account.institutionalId,
+      name: account.name,
+      email: account.email,
       role: "Library Staff",
       desk: "Circulation Desk 01",
       shift: "08:00 - 17:00",
-      token: "staff-session-" + Date.now(),
+      mustChangePassword: account.mustChangePassword,
+      token: signToken(account),
     };
 
     await logAction(
@@ -388,8 +410,10 @@ const loginStaff = async (req, res) => {
   } catch (error) {
     return res.status(500).json({
       success: false,
-      message: "Staff login failed",
-      error: error.message,
+      message:
+        error && error.message && error.message.indexOf("JWT_SECRET") !== -1
+          ? error.message
+          : "Staff login failed",
     });
   }
 };
