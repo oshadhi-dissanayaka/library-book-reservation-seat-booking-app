@@ -1,8 +1,12 @@
 import {
+  AddSeatPayload,
   Book,
+  CreateBookPayload,
+  CreateReadingRoomPayload,
   NoShowsSummaryData,
   ReadingRoomInfo,
   Reservation,
+  Seat,
   StaffDashboardData,
   StaffUser,
 } from '../types/staff.types';
@@ -530,6 +534,54 @@ export const staffApi = {
   },
 
   /**
+   * Add New Book to Library Catalog
+   */
+  async createBook(
+    payload: CreateBookPayload
+  ): Promise<{ success: boolean; message: string; data: Book }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/books`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, staffId: payload.staffId || 'STF-4092' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to create book');
+      }
+    } catch (err: any) {
+      if (err.message && !err.message.includes('fetch') && !err.message.includes('Network')) {
+        throw err;
+      }
+      // Offline fallback
+      const fallbackBook: Book = {
+        _id: 'b-' + Date.now(),
+        title: payload.title,
+        author: payload.author,
+        edition: payload.edition || '1st Edition',
+        isbn: payload.isbn || '',
+        category: payload.category || 'General',
+        shelfLocation: payload.shelfLocation,
+        branch: payload.branch || 'Main Library',
+        totalCopies: payload.totalCopies,
+        availableCopies: payload.availableCopies ?? payload.totalCopies,
+        status: payload.status || 'Available',
+        notes: payload.notes || '',
+      };
+      FALLBACK_BOOKS.unshift(fallbackBook);
+      return {
+        success: true,
+        message: `Book "${fallbackBook.title}" created successfully`,
+        data: fallbackBook,
+      };
+    }
+    throw new Error('Could not create book');
+  },
+
+  /**
    * Reading Room Floor Occupancy & Seat Map
    */
   async getOccupancy(): Promise<{
@@ -625,6 +677,78 @@ export const staffApi = {
       success: true,
       message: `Seat status updated to ${status}`,
     };
+  },
+
+  /**
+   * Add New Reading Room
+   */
+  async createReadingRoom(
+    payload: CreateReadingRoomPayload
+  ): Promise<{ success: boolean; message: string; data: any }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/reading-rooms`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, staffId: payload.staffId || 'STF-4092' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to create reading room');
+      }
+    } catch (err: any) {
+      if (err.message && !err.message.includes('fetch') && !err.message.includes('Network')) {
+        throw err;
+      }
+      return {
+        success: true,
+        message: `Reading room "${payload.name}" created successfully`,
+        data: payload,
+      };
+    }
+    throw new Error('Could not create reading room');
+  },
+
+  /**
+   * Add New Seat to Reading Room
+   */
+  async addSeat(
+    payload: AddSeatPayload
+  ): Promise<{ success: boolean; message: string; data: Seat }> {
+    try {
+      const res = await fetch(`${API_BASE_URL}/occupancy/seats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...payload, staffId: payload.staffId || 'STF-4092' }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        return data;
+      }
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to add seat');
+      }
+    } catch (err: any) {
+      if (err.message && !err.message.includes('fetch') && !err.message.includes('Network')) {
+        throw err;
+      }
+      const fallbackSeat: Seat = {
+        _id: 'seat-' + Date.now(),
+        seatNumber: payload.seatNumber.toUpperCase(),
+        room: payload.room,
+        floor: payload.floor || 'Floor 02',
+        wing: payload.wing || 'West Wing',
+        status: payload.status || 'available',
+      };
+      return {
+        success: true,
+        message: `Seat "${fallbackSeat.seatNumber}" added successfully`,
+        data: fallbackSeat,
+      };
+    }
+    throw new Error('Could not add seat');
   },
 
   /**

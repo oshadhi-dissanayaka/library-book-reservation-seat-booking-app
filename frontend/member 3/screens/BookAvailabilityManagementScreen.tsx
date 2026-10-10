@@ -4,6 +4,7 @@ import {
   FlatList,
   Modal,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -36,6 +37,22 @@ export const BookAvailabilityManagementScreen: React.FC<
   const [editShelf, setEditShelf] = useState('');
   const [editNotes, setEditNotes] = useState('');
   const [updating, setUpdating] = useState(false);
+
+  // Add New Book form state
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newTitle, setNewTitle] = useState('');
+  const [newAuthor, setNewAuthor] = useState('');
+  const [newEdition, setNewEdition] = useState('1st Edition');
+  const [newIsbn, setNewIsbn] = useState('');
+  const [newCategory, setNewCategory] = useState('Computer Science');
+  const [newShelf, setNewShelf] = useState('');
+  const [newBranch, setNewBranch] = useState('Main Library');
+  const [newTotalCopies, setNewTotalCopies] = useState('1');
+  const [newAvailableCopies, setNewAvailableCopies] = useState('1');
+  const [newStatus, setNewStatus] = useState<BookStatus>('Available');
+  const [newNotes, setNewNotes] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [addError, setAddError] = useState('');
 
   const fetchBooks = async () => {
     try {
@@ -95,6 +112,86 @@ export const BookAvailabilityManagementScreen: React.FC<
     }
   };
 
+  const openAddModal = () => {
+    setNewTitle('');
+    setNewAuthor('');
+    setNewEdition('1st Edition');
+    setNewIsbn('');
+    setNewCategory('Computer Science');
+    setNewShelf('');
+    setNewBranch('Main Library');
+    setNewTotalCopies('1');
+    setNewAvailableCopies('1');
+    setNewStatus('Available');
+    setNewNotes('');
+    setAddError('');
+    setShowAddModal(true);
+  };
+
+  const handleCreateBook = async () => {
+    setAddError('');
+
+    if (!newTitle.trim()) {
+      setAddError('Please enter a book title.');
+      return;
+    }
+    if (!newAuthor.trim()) {
+      setAddError('Please enter the author.');
+      return;
+    }
+    if (!newShelf.trim()) {
+      setAddError('Please enter a shelf location (e.g. Main Library • Shelf A12).');
+      return;
+    }
+
+    const total = parseInt(newTotalCopies, 10);
+    if (isNaN(total) || total < 1) {
+      setAddError('Total copies must be at least 1.');
+      return;
+    }
+
+    const avail = newAvailableCopies.trim() ? parseInt(newAvailableCopies, 10) : total;
+    if (isNaN(avail) || avail < 0) {
+      setAddError('Available copies cannot be negative.');
+      return;
+    }
+    if (avail > total) {
+      setAddError('Available copies cannot exceed total copies.');
+      return;
+    }
+
+    setCreating(true);
+    try {
+      const res = await staffApi.createBook({
+        title: newTitle.trim(),
+        author: newAuthor.trim(),
+        edition: newEdition.trim(),
+        isbn: newIsbn.trim(),
+        category: newCategory.trim(),
+        shelfLocation: newShelf.trim(),
+        branch: newBranch.trim(),
+        totalCopies: total,
+        availableCopies: avail,
+        status: newStatus,
+        notes: newNotes.trim(),
+        staffId,
+      });
+
+      if (res.success) {
+        setShowAddModal(false);
+        setFeedback(`Book "${res.data.title}" added to catalog successfully.`);
+        setTimeout(() => setFeedback(''), 4000);
+        fetchBooks();
+      } else {
+        setAddError(res.message || 'Failed to add book.');
+      }
+    } catch (err: any) {
+      setAddError(err.message || 'Error communicating with server.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
   return (
     <View style={styles.container}>
       <StaffHeader
@@ -133,6 +230,12 @@ export const BookAvailabilityManagementScreen: React.FC<
         <Text style={styles.counterText}>
           CATALOG TITLES ({books.length})
         </Text>
+        <TouchableOpacity
+          style={styles.addBookBtn}
+          onPress={openAddModal}
+          activeOpacity={0.8}>
+          <Text style={styles.addBookBtnText}>+ Add New Book</Text>
+        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -292,6 +395,209 @@ export const BookAvailabilityManagementScreen: React.FC<
           </View>
         </View>
       </Modal>
+
+      {/* Add New Book Modal */}
+      <Modal
+        visible={showAddModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => {
+          if (!creating) setShowAddModal(false);
+        }}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.addBookSheet}>
+            <View style={styles.sheetHeader}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.sheetTitle}>Add New Book</Text>
+                <Text style={styles.sheetSubHeader}>Institutional Circulation Catalog</Text>
+              </View>
+              <TouchableOpacity
+                onPress={() => setShowAddModal(false)}
+                disabled={creating}
+                style={styles.closeModalIconBtn}>
+                <Text style={styles.closeModalIcon}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {addError ? (
+              <View style={styles.errorBox}>
+                <Text style={styles.errorText}>⚠️ {addError}</Text>
+              </View>
+            ) : null}
+
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.addFormScroll}
+              keyboardShouldPersistTaps="handled">
+              {/* Title */}
+              <Text style={styles.fieldLabel}>BOOK TITLE *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newTitle}
+                onChangeText={setNewTitle}
+                placeholder="e.g. Distributed Database Systems"
+                placeholderTextColor="#94A3B8"
+              />
+
+              {/* Author */}
+              <Text style={styles.fieldLabel}>AUTHOR(S) *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newAuthor}
+                onChangeText={setNewAuthor}
+                placeholder="e.g. M. Tamer Özsu, Patrick Valduriez"
+                placeholderTextColor="#94A3B8"
+              />
+
+              {/* Shelf Location */}
+              <Text style={styles.fieldLabel}>SHELF LOCATION *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newShelf}
+                onChangeText={setNewShelf}
+                placeholder="e.g. Main Library • Shelf A12"
+                placeholderTextColor="#94A3B8"
+              />
+
+              {/* Edition and Category */}
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.fieldLabel}>EDITION</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newEdition}
+                    onChangeText={setNewEdition}
+                    placeholder="e.g. 3rd Edition"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.fieldLabel}>CATEGORY</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newCategory}
+                    onChangeText={setNewCategory}
+                    placeholder="e.g. Computer Science"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+
+              {/* ISBN and Branch */}
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.fieldLabel}>ISBN</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newIsbn}
+                    onChangeText={setNewIsbn}
+                    placeholder="e.g. 978-0132143844"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.fieldLabel}>BRANCH</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newBranch}
+                    onChangeText={setNewBranch}
+                    placeholder="e.g. Main Library"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+
+              {/* Copies (Total & Available) */}
+              <View style={styles.formRow}>
+                <View style={styles.formCol}>
+                  <Text style={styles.fieldLabel}>TOTAL COPIES *</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newTotalCopies}
+                    onChangeText={(val) => {
+                      setNewTotalCopies(val);
+                      if (!newAvailableCopies || newAvailableCopies === newTotalCopies) {
+                        setNewAvailableCopies(val);
+                      }
+                    }}
+                    placeholder="e.g. 5"
+                    keyboardType="number-pad"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+                <View style={styles.formCol}>
+                  <Text style={styles.fieldLabel}>AVAILABLE COPIES</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newAvailableCopies}
+                    onChangeText={setNewAvailableCopies}
+                    placeholder="e.g. 5"
+                    keyboardType="number-pad"
+                    placeholderTextColor="#94A3B8"
+                  />
+                </View>
+              </View>
+
+              {/* Status Selector */}
+              <Text style={styles.fieldLabel}>INITIAL STATUS</Text>
+              <View style={styles.statusButtonsRow}>
+                {(['Available', 'Unavailable', 'Under Maintenance'] as BookStatus[]).map(
+                  (st) => {
+                    const isSel = newStatus === st;
+                    return (
+                      <TouchableOpacity
+                        key={st}
+                        style={[
+                          styles.statusOptionBtn,
+                          isSel && styles.activeStatusOptionBtn,
+                        ]}
+                        onPress={() => setNewStatus(st)}>
+                        <Text
+                          style={[
+                            styles.statusOptionText,
+                            isSel && styles.activeStatusOptionText,
+                          ]}>
+                          {st}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                )}
+              </View>
+
+              {/* Catalog Notes */}
+              <Text style={styles.fieldLabel}>CATALOG / CONDITION NOTES</Text>
+              <TextInput
+                style={[styles.inputField, { minHeight: 60 }]}
+                value={newNotes}
+                onChangeText={setNewNotes}
+                placeholder="e.g. Core reference text for database module"
+                placeholderTextColor="#94A3B8"
+                multiline
+              />
+
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleCreateBook}
+                disabled={creating}
+                activeOpacity={0.8}>
+                {creating ? (
+                  <ActivityIndicator color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.saveBtnText}>SAVE BOOK TO CATALOG</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setShowAddModal(false)}
+                disabled={creating}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -345,6 +651,25 @@ const styles = StyleSheet.create({
   counterRow: {
     paddingHorizontal: 16,
     paddingVertical: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  addBookBtn: {
+    backgroundColor: '#2563EB',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 8,
+    shadowColor: '#2563EB',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  addBookBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '800',
   },
   counterText: {
     fontSize: 11,
@@ -585,5 +910,54 @@ const styles = StyleSheet.create({
     color: '#64748B',
     fontSize: 13,
     fontWeight: '700',
+  },
+  addBookSheet: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    maxHeight: '90%',
+  },
+  sheetHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  sheetSubHeader: {
+    color: '#64748B',
+    fontSize: 12,
+    marginTop: 2,
+  },
+  closeModalIconBtn: {
+    padding: 6,
+  },
+  closeModalIcon: {
+    fontSize: 18,
+    color: '#94A3B8',
+    fontWeight: '700',
+  },
+  errorBox: {
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  errorText: {
+    color: '#DC2626',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  addFormScroll: {
+    paddingBottom: 28,
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  formCol: {
+    flex: 1,
   },
 });
