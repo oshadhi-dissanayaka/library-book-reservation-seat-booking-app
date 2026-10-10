@@ -6,6 +6,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -29,6 +30,115 @@ export const ReadingRoomOccupancyScreen: React.FC<
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
   const [feedback, setFeedback] = useState('');
   const [error, setError] = useState('');
+
+  // Add Room state
+  const [isAddRoomModalOpen, setIsAddRoomModalOpen] = useState(false);
+  const [newRoomName, setNewRoomName] = useState('');
+  const [newRoomBuilding, setNewRoomBuilding] = useState('Main Library');
+  const [newRoomFloor, setNewRoomFloor] = useState('Floor 02');
+  const [newRoomZone, setNewRoomZone] = useState('General');
+  const [newRoomTotalSeats, setNewRoomTotalSeats] = useState<number>(20);
+  const [newRoomOpening, setNewRoomOpening] = useState('08:00');
+  const [newRoomClosing, setNewRoomClosing] = useState('18:30');
+  const [addingRoom, setAddingRoom] = useState(false);
+  const [addRoomError, setAddRoomError] = useState('');
+
+  // Add Seats state
+  const [roomForAddingSeats, setRoomForAddingSeats] = useState<ReadingRoomInfo | null>(null);
+  const [seatsToAdd, setSeatsToAdd] = useState<number>(5);
+  const [addingSeats, setAddingSeats] = useState(false);
+  const [addSeatsError, setAddSeatsError] = useState('');
+
+  const resetAddRoomForm = () => {
+    setNewRoomName('');
+    setNewRoomBuilding('Main Library');
+    setNewRoomFloor('Floor 02');
+    setNewRoomZone('General');
+    setNewRoomTotalSeats(20);
+    setNewRoomOpening('08:00');
+    setNewRoomClosing('18:30');
+    setAddRoomError('');
+  };
+
+  const handleAddRoom = async () => {
+    if (!newRoomName.trim()) {
+      setAddRoomError('Room name is required.');
+      return;
+    }
+    if (!newRoomBuilding.trim()) {
+      setAddRoomError('Building is required.');
+      return;
+    }
+    if (!newRoomFloor.trim()) {
+      setAddRoomError('Floor is required.');
+      return;
+    }
+    if (newRoomTotalSeats < 1) {
+      setAddRoomError('Total seats must be at least 1.');
+      return;
+    }
+
+    setAddingRoom(true);
+    setAddRoomError('');
+
+    try {
+      const res = await staffApi.createReadingRoom({
+        name: newRoomName.trim(),
+        building: newRoomBuilding.trim(),
+        floor: newRoomFloor.trim(),
+        zone: newRoomZone.trim() || 'General',
+        totalSeats: newRoomTotalSeats,
+        openingTime: newRoomOpening.trim() || '08:00',
+        closingTime: newRoomClosing.trim() || '18:30',
+        staffId,
+      });
+
+      if (res.success) {
+        setIsAddRoomModalOpen(false);
+        resetAddRoomForm();
+        setFeedback(`Reading room "${newRoomName.trim()}" added successfully.`);
+        setTimeout(() => setFeedback(''), 3500);
+        fetchOccupancy();
+      } else {
+        setAddRoomError(res.message || 'Failed to add reading room.');
+      }
+    } catch {
+      setAddRoomError('Failed to add reading room. Please check connection.');
+    } finally {
+      setAddingRoom(false);
+    }
+  };
+
+  const handleAddSeats = async () => {
+    if (!roomForAddingSeats) return;
+    if (seatsToAdd < 1) {
+      setAddSeatsError('Additional seats must be at least 1.');
+      return;
+    }
+
+    setAddingSeats(true);
+    setAddSeatsError('');
+
+    try {
+      const targetIdentifier = roomForAddingSeats._id || roomForAddingSeats.name;
+      const res = await staffApi.addSeatsToRoom(targetIdentifier, seatsToAdd, staffId);
+
+      if (res.success) {
+        const roomName = roomForAddingSeats.name;
+        setRoomForAddingSeats(null);
+        setSeatsToAdd(5);
+        setFeedback(`Added ${seatsToAdd} seats to "${roomName}".`);
+        setTimeout(() => setFeedback(''), 3500);
+        fetchOccupancy();
+      } else {
+        setAddSeatsError(res.message || 'Failed to add seats.');
+      }
+    } catch {
+      setAddSeatsError('Failed to add seats.');
+    } finally {
+      setAddingSeats(false);
+    }
+  };
 
   const fetchOccupancy = async () => {
     try {
@@ -75,11 +185,6 @@ export const ReadingRoomOccupancyScreen: React.FC<
     }
   };
 
-  const roomA = rooms.find((r) => r.name.includes('Room A')) || rooms[0];
-  const roomB = rooms.find((r) => r.name.includes('Room B')) || rooms[1];
-
-  const seatsList = roomA?.seats || [];
-
   return (
     <View style={styles.container}>
       <StaffHeader
@@ -113,144 +218,148 @@ export const ReadingRoomOccupancyScreen: React.FC<
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }>
-          {/* Room A Card */}
-          <View style={styles.roomCard}>
-            <View style={styles.roomHeaderRow}>
-              <View>
-                <Text style={styles.roomName}>{roomA?.name || '—'}</Text>
-                <Text style={styles.roomLocation}>
-                  {roomA?.floor || '—'} • {roomA?.wing || '—'}
-                </Text>
-              </View>
-              <View style={styles.liveBadge}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>LIVE CHECK</Text>
-              </View>
-            </View>
+          {/* Reading Rooms Section Header */}
+          <View style={styles.roomsTopBar}>
+            <Text style={styles.sectionHeading}>
+              READING ROOMS ({rooms.length})
+            </Text>
+            <TouchableOpacity
+              style={styles.addRoomBtn}
+              onPress={() => {
+                resetAddRoomForm();
+                setIsAddRoomModalOpen(true);
+              }}
+              activeOpacity={0.8}>
+              <Text style={styles.addRoomBtnText}>+ Add Room</Text>
+            </TouchableOpacity>
+          </View>
 
-            <View style={styles.occupancyBarRow}>
-              <Text style={styles.occupancyStats}>
-                <Text style={styles.occupiedBold}>{roomA?.occupiedSeats ?? 0}</Text> /{' '}
-                {roomA?.totalSeats ?? 0} seats occupied
-              </Text>
-              <Text style={styles.freeSeatsText}>
-                {roomA?.availableSeats ?? 0} seats free
-              </Text>
-            </View>
+          {/* Dynamic Reading Room Cards */}
+          {rooms.map((room, roomIdx) => {
+            const hasSeats = room.seats && room.seats.length > 0;
+            const occupancyPct =
+              room.totalSeats > 0
+                ? Math.round((room.occupiedSeats / room.totalSeats) * 100)
+                : 0;
 
-            {/* Progress Bar */}
-            <View style={styles.progressBarTrack}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${
-                      roomA && roomA.totalSeats > 0
-                        ? Math.round((roomA.occupiedSeats / roomA.totalSeats) * 100)
-                        : 0
-                    }%`,
-                  },
-                ]}
-              />
-            </View>
-
-            {/* Interactive Matrix Title */}
-            <Text style={styles.matrixTitle}>INTERACTIVE SEAT MAP (ROOM A)</Text>
-
-            {/* Legend */}
-            <View style={styles.legendRow}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendBox, styles.occupiedBox]} />
-                <Text style={styles.legendLabel}>Occupied</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendBox, styles.reservedBox]} />
-                <Text style={styles.legendLabel}>Reserved</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendBox, styles.availableBox]} />
-                <Text style={styles.legendLabel}>Available</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendBox, styles.selectedBox]} />
-                <Text style={styles.legendLabel}>Tap to Inspect</Text>
-              </View>
-            </View>
-
-            {/* Seat Grid */}
-            <View style={styles.seatGrid}>
-              {seatsList.map((seat) => {
-                const isOccupied = seat.status === 'occupied';
-                const isReserved = seat.status === 'reserved';
-                return (
-                  <TouchableOpacity
-                    key={seat._id || seat.seatNumber}
-                    style={[
-                      styles.seatBtn,
-                      isOccupied
-                        ? styles.seatOccupied
-                        : isReserved
-                          ? styles.seatReserved
-                          : styles.seatAvailable,
-                    ]}
-                    onPress={() => setSelectedSeat(seat)}
-                    activeOpacity={0.7}>
-                    <Text
-                      style={[
-                        styles.seatNumberText,
-                        isOccupied
-                          ? styles.textOccupied
-                          : isReserved
-                            ? styles.textReserved
-                            : styles.textAvailable,
-                      ]}>
-                      {seat.seatNumber}
+            return (
+              <View key={room._id || room.name || roomIdx} style={styles.roomCard}>
+                <View style={styles.roomHeaderRow}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.roomName}>{room.name || '—'}</Text>
+                    <Text style={styles.roomLocation}>
+                      {room.floor || '—'} • {room.wing || '—'}
                     </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
+                  </View>
+                  <View style={styles.roomHeaderActions}>
+                    <TouchableOpacity
+                      style={styles.addSeatsBtn}
+                      onPress={() => {
+                        setRoomForAddingSeats(room);
+                        setSeatsToAdd(5);
+                        setAddSeatsError('');
+                      }}
+                      activeOpacity={0.8}>
+                      <Text style={styles.addSeatsBtnText}>+ Add Seats</Text>
+                    </TouchableOpacity>
+                    {hasSeats ? (
+                      <View style={styles.liveBadge}>
+                        <View style={styles.liveDot} />
+                        <Text style={styles.liveText}>LIVE CHECK</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.quietBadge}>
+                        <Text style={styles.quietText}>OPEN</Text>
+                      </View>
+                    )}
+                  </View>
+                </View>
 
-          {/* Room B Card */}
-          <View style={styles.roomCard}>
-            <View style={styles.roomHeaderRow}>
-              <View>
-                <Text style={styles.roomName}>{roomB?.name || '—'}</Text>
-                <Text style={styles.roomLocation}>
-                  {roomB?.floor || '—'} • {roomB?.wing || '—'}
-                </Text>
+                <View style={styles.occupancyBarRow}>
+                  <Text style={styles.occupancyStats}>
+                    <Text style={styles.occupiedBold}>{room.occupiedSeats ?? 0}</Text> /{' '}
+                    {room.totalSeats ?? 0} seats occupied
+                  </Text>
+                  <Text style={styles.freeSeatsText}>
+                    {room.availableSeats ?? 0} seats free
+                  </Text>
+                </View>
+
+                {/* Progress Bar */}
+                <View style={styles.progressBarTrack}>
+                  <View
+                    style={[
+                      styles.progressBarFill,
+                      { width: `${occupancyPct}%` },
+                    ]}
+                  />
+                </View>
+
+                {/* Interactive Seat Map (if seats exist) */}
+                {hasSeats ? (
+                  <>
+                    <Text style={styles.matrixTitle}>
+                      INTERACTIVE SEAT MAP ({room.name.toUpperCase()})
+                    </Text>
+
+                    {/* Legend */}
+                    <View style={styles.legendRow}>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendBox, styles.occupiedBox]} />
+                        <Text style={styles.legendLabel}>Occupied</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendBox, styles.reservedBox]} />
+                        <Text style={styles.legendLabel}>Reserved</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendBox, styles.availableBox]} />
+                        <Text style={styles.legendLabel}>Available</Text>
+                      </View>
+                      <View style={styles.legendItem}>
+                        <View style={[styles.legendBox, styles.selectedBox]} />
+                        <Text style={styles.legendLabel}>Tap to Inspect</Text>
+                      </View>
+                    </View>
+
+                    {/* Seat Grid */}
+                    <View style={styles.seatGrid}>
+                      {room.seats.map((seat) => {
+                        const isOccupied = seat.status === 'occupied';
+                        const isReserved = seat.status === 'reserved';
+                        return (
+                          <TouchableOpacity
+                            key={seat._id || seat.seatNumber}
+                            style={[
+                              styles.seatBtn,
+                              isOccupied
+                                ? styles.seatOccupied
+                                : isReserved
+                                  ? styles.seatReserved
+                                  : styles.seatAvailable,
+                            ]}
+                            onPress={() => setSelectedSeat(seat)}
+                            activeOpacity={0.7}>
+                            <Text
+                              style={[
+                                styles.seatNumberText,
+                                isOccupied
+                                  ? styles.textOccupied
+                                  : isReserved
+                                    ? styles.textReserved
+                                    : styles.textAvailable,
+                              ]}>
+                              {seat.seatNumber}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
               </View>
-              <View style={styles.quietBadge}>
-                <Text style={styles.quietText}>OPEN</Text>
-              </View>
-            </View>
-
-            <View style={styles.occupancyBarRow}>
-              <Text style={styles.occupancyStats}>
-                <Text style={styles.occupiedBold}>{roomB?.occupiedSeats ?? 0}</Text> /{' '}
-                {roomB?.totalSeats ?? 0} seats occupied
-              </Text>
-              <Text style={styles.freeSeatsText}>
-                {roomB?.availableSeats ?? 0} seats free
-              </Text>
-            </View>
-
-            <View style={styles.progressBarTrack}>
-              <View
-                style={[
-                  styles.progressBarFill,
-                  {
-                    width: `${
-                      roomB && roomB.totalSeats > 0
-                        ? Math.round((roomB.occupiedSeats / roomB.totalSeats) * 100)
-                        : 0
-                    }%`,
-                  },
-                ]}
-              />
-            </View>
-          </View>
+            );
+          })}
 
           {/* No-Shows and Cancellations Action Button */}
           <TouchableOpacity
@@ -359,6 +468,205 @@ export const ReadingRoomOccupancyScreen: React.FC<
           </View>
         </View>
       </Modal>
+
+      {/* Add New Reading Room Modal */}
+      <Modal
+        visible={isAddRoomModalOpen}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsAddRoomModalOpen(false)}>
+        <View style={styles.modalBackdropSheet}>
+          <View style={[styles.editorSheet, { maxHeight: '85%' }]}>
+            <Text style={styles.sheetTitle}>Add New Reading Room</Text>
+            <Text style={styles.sheetSub}>Configure new room and seat capacity</Text>
+
+            {addRoomError ? (
+              <View style={styles.modalErrorBox}>
+                <Text style={styles.modalErrorText}>⚠️ {addRoomError}</Text>
+              </View>
+            ) : null}
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              {/* Room Name */}
+              <Text style={styles.fieldLabel}>ROOM NAME *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newRoomName}
+                onChangeText={setNewRoomName}
+                placeholder="e.g. Reading Room C"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Building */}
+              <Text style={styles.fieldLabel}>BUILDING *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newRoomBuilding}
+                onChangeText={setNewRoomBuilding}
+                placeholder="e.g. Main Library"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Floor */}
+              <Text style={styles.fieldLabel}>FLOOR *</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newRoomFloor}
+                onChangeText={setNewRoomFloor}
+                placeholder="e.g. Floor 03"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Zone / Wing */}
+              <Text style={styles.fieldLabel}>ZONE / WING</Text>
+              <TextInput
+                style={styles.inputField}
+                value={newRoomZone}
+                onChangeText={setNewRoomZone}
+                placeholder="e.g. North Wing"
+                placeholderTextColor={staffTheme.placeholder}
+              />
+
+              {/* Total Seats Stepper */}
+              <Text style={styles.fieldLabel}>TOTAL SEATS (CAPACITY)</Text>
+              <View style={styles.stepperRow}>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setNewRoomTotalSeats(Math.max(1, newRoomTotalSeats - 5))}>
+                  <Text style={styles.stepperBtnText}>−5</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setNewRoomTotalSeats(Math.max(1, newRoomTotalSeats - 1))}>
+                  <Text style={styles.stepperBtnText}>−</Text>
+                </TouchableOpacity>
+                <Text style={styles.stepperValue}>{newRoomTotalSeats}</Text>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setNewRoomTotalSeats(newRoomTotalSeats + 1)}>
+                  <Text style={styles.stepperBtnText}>+</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.stepperBtn}
+                  onPress={() => setNewRoomTotalSeats(newRoomTotalSeats + 5)}>
+                  <Text style={styles.stepperBtnText}>+5</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Opening & Closing Time */}
+              <View style={styles.twoColRow}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.fieldLabel}>OPENING TIME</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newRoomOpening}
+                    onChangeText={setNewRoomOpening}
+                    placeholder="08:00"
+                    placeholderTextColor={staffTheme.placeholder}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.fieldLabel}>CLOSING TIME</Text>
+                  <TextInput
+                    style={styles.inputField}
+                    value={newRoomClosing}
+                    onChangeText={setNewRoomClosing}
+                    placeholder="18:30"
+                    placeholderTextColor={staffTheme.placeholder}
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.saveBtn}
+                onPress={handleAddRoom}
+                disabled={addingRoom}
+                activeOpacity={0.8}>
+                {addingRoom ? (
+                  <ActivityIndicator color={staffTheme.white} />
+                ) : (
+                  <Text style={styles.saveBtnText}>SAVE READING ROOM</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.cancelBtn}
+                onPress={() => setIsAddRoomModalOpen(false)}
+                disabled={addingRoom}>
+                <Text style={styles.cancelBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Seats Modal */}
+      <Modal
+        visible={!!roomForAddingSeats}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRoomForAddingSeats(null)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.seatModalCard}>
+            <Text style={styles.seatModalTitle}>Add Seats</Text>
+            <Text style={styles.seatModalRoom}>
+              {roomForAddingSeats?.name} (Current: {roomForAddingSeats?.totalSeats} seats)
+            </Text>
+
+            {addSeatsError ? (
+              <View style={styles.modalErrorBox}>
+                <Text style={styles.modalErrorText}>⚠️ {addSeatsError}</Text>
+              </View>
+            ) : null}
+
+            <Text style={styles.fieldLabel}>SEATS TO ADD</Text>
+            <View style={styles.stepperRow}>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setSeatsToAdd(Math.max(1, seatsToAdd - 5))}>
+                <Text style={styles.stepperBtnText}>−5</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setSeatsToAdd(Math.max(1, seatsToAdd - 1))}>
+                <Text style={styles.stepperBtnText}>−</Text>
+              </TouchableOpacity>
+              <Text style={styles.stepperValue}>{seatsToAdd}</Text>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setSeatsToAdd(seatsToAdd + 1)}>
+                <Text style={styles.stepperBtnText}>+</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.stepperBtn}
+                onPress={() => setSeatsToAdd(seatsToAdd + 5)}>
+                <Text style={styles.stepperBtnText}>+5</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TouchableOpacity
+              style={[styles.saveBtn, { marginTop: 16 }]}
+              onPress={handleAddSeats}
+              disabled={addingSeats}
+              activeOpacity={0.8}>
+              {addingSeats ? (
+                <ActivityIndicator color={staffTheme.white} />
+              ) : (
+                <Text style={styles.saveBtnText}>
+                  ADD {seatsToAdd} SEATS (NEW TOTAL: {(roomForAddingSeats?.totalSeats ?? 0) + seatsToAdd})
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.cancelBtn}
+              onPress={() => setRoomForAddingSeats(null)}
+              disabled={addingSeats}>
+              <Text style={styles.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -409,6 +717,29 @@ const styles = StyleSheet.create({
     color: staffTheme.muted,
     fontSize: 14,
   },
+  roomsTopBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sectionHeading: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: staffTheme.muted,
+    letterSpacing: 0.8,
+  },
+  addRoomBtn: {
+    backgroundColor: staffTheme.navy,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+  },
+  addRoomBtnText: {
+    color: staffTheme.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   roomCard: {
     backgroundColor: staffTheme.white,
     borderRadius: 16,
@@ -437,6 +768,22 @@ const styles = StyleSheet.create({
     color: staffTheme.muted,
     fontSize: 12,
     marginTop: 2,
+  },
+  roomHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  addSeatsBtn: {
+    backgroundColor: staffTheme.navy,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  addSeatsBtnText: {
+    color: staffTheme.white,
+    fontSize: 11,
+    fontWeight: '700',
   },
   liveBadge: {
     flexDirection: 'row',
@@ -613,6 +960,120 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+  },
+  modalBackdropSheet: {
+    flex: 1,
+    backgroundColor: 'rgba(15, 23, 42, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  editorSheet: {
+    backgroundColor: staffTheme.white,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 24,
+    paddingBottom: 40,
+  },
+  sheetTitle: {
+    color: staffTheme.ink,
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  sheetSub: {
+    color: staffTheme.navy,
+    fontSize: 13,
+    fontWeight: '700',
+    marginTop: 2,
+    marginBottom: 16,
+  },
+  fieldLabel: {
+    color: staffTheme.muted,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.6,
+    marginBottom: 8,
+    marginTop: 12,
+  },
+  inputField: {
+    backgroundColor: staffTheme.canvas,
+    borderWidth: 1.5,
+    borderColor: staffTheme.line,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: staffTheme.ink,
+    marginBottom: 6,
+  },
+  stepperRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  stepperBtn: {
+    paddingHorizontal: 12,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: staffTheme.canvas,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: staffTheme.line,
+  },
+  stepperBtnText: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: staffTheme.ink,
+  },
+  stepperValue: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: staffTheme.ink,
+    minWidth: 32,
+    textAlign: 'center',
+  },
+  twoColRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  saveBtn: {
+    backgroundColor: staffTheme.navy,
+    borderRadius: 14,
+    paddingVertical: 14,
+    alignItems: 'center',
+    marginTop: 18,
+    shadowColor: staffTheme.navy,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  saveBtnText: {
+    color: staffTheme.white,
+    fontSize: 14,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  cancelBtn: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  cancelBtnText: {
+    color: staffTheme.muted,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  modalErrorBox: {
+    backgroundColor: staffTheme.paleRed,
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  modalErrorText: {
+    color: staffTheme.red,
+    fontSize: 12,
+    fontWeight: '700',
   },
   seatModalCard: {
     width: '100%',

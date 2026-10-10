@@ -84,7 +84,9 @@ export interface Seat {
 }
 
 export interface ReadingRoomInfo {
+  _id?: string;
   name: string;
+  building?: string;
   floor: string;
   wing: string;
   totalSeats: number;
@@ -92,6 +94,40 @@ export interface ReadingRoomInfo {
   availableSeats: number;
   occupancyRate: number;
   seats: Seat[];
+}
+
+export interface CreateBookPayload {
+  title: string;
+  author: string;
+  edition?: string;
+  isbn?: string;
+  category?: string;
+  shelfLocation: string;
+  totalCopies: number;
+  notes?: string;
+  publisher?: string;
+  publicationYear?: number;
+  callNumber?: string;
+  description?: string;
+  staffId?: string;
+}
+
+export interface CreateReadingRoomPayload {
+  name: string;
+  building: string;
+  floor: string;
+  zone?: string;
+  description?: string;
+  openingTime?: string;
+  closingTime?: string;
+  totalSeats: number;
+  status?: 'active' | 'inactive' | 'maintenance';
+  staffId?: string;
+}
+
+export interface AddSeatsPayload {
+  additionalSeats: number;
+  staffId?: string;
 }
 
 export interface StaffUser {
