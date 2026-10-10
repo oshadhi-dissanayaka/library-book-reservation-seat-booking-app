@@ -5,7 +5,10 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 
-require("dotenv").config();
+require("dotenv").config({
+  path: require("path").join(__dirname, ".env"),
+  quiet: true,
+});
 
 // Routes
 const managementRoutes = require("./routes/managementRoutes");
@@ -44,19 +47,40 @@ app.get("/", (req, res) => {
   });
 });
 
-// MongoDB Connection
-mongoose
-  .connect(process.env.MONGO_URI)
-  .then(() => {
-    console.log("MongoDB connected successfully");
-  })
-  .catch((error) => {
-    console.error("MongoDB connection error:", error.message);
+async function startServer() {
+  const uri = process.env.MONGO_URI?.trim();
+  if (!uri) {
+    throw new Error(
+      "MONGO_URI is missing. Add your MongoDB Atlas connection string to backend/.env."
+    );
+  }
+  if (!/^mongodb(?:\+srv)?:\/\//.test(uri)) {
+    throw new Error("MONGO_URI must start with mongodb:// or mongodb+srv://.");
+  }
+
+  try {
+    await mongoose.connect(uri, { serverSelectionTimeoutMS: 10000 });
+  } catch (error) {
+    // Do not log the URI or raw driver errors, which can contain credentials.
+    const reason = error.code === 18
+      ? "Atlas authentication failed. Check the database username and password."
+      : "Check the Atlas connection string, database user, Network Access IP list, and network/DNS access.";
+    throw new Error(`MongoDB connection failed. ${reason}`);
+  }
+
+  console.log("MongoDB connected successfully");
+  const port = process.env.PORT || 5000;
+  return app.listen(port, () => {
+    console.log(`Server running on port ${port}`);
   });
+}
 
-// Server
-const PORT = process.env.PORT || 5000;
+if (require.main === module) {
+  startServer().catch(async (error) => {
+    console.error(error.message);
+    await mongoose.disconnect();
+    process.exitCode = 1;
+  });
+}
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+module.exports = { app, startServer };

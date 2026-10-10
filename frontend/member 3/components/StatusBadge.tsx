@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
+import { staffTheme } from '../theme/staffTheme';
+
 interface StatusBadgeProps {
   status: string;
   size?: 'small' | 'medium';
@@ -9,72 +11,72 @@ interface StatusBadgeProps {
 export const StatusBadge: React.FC<StatusBadgeProps> = ({ status, size = 'small' }) => {
   const normStatus = (status || '').toUpperCase();
 
-  let bg = '#E2E8F0';
-  let borderColor = '#CBD5E1';
-  let textColor = '#334155';
+  let bg: string = staffTheme.canvas;
+  let borderColor: string = staffTheme.line;
+  let textColor: string = staffTheme.muted;
   let label = status;
 
   switch (normStatus) {
     case 'CONFIRMED':
-      bg = '#DCFCE7';
-      borderColor = '#86EFAC';
-      textColor = '#15803D';
+      bg = staffTheme.paleGreen;
+      borderColor = staffTheme.greenLine;
+      textColor = staffTheme.green;
       label = 'CONFIRMED';
       break;
     case 'READY_FOR_PICKUP':
-      bg = '#DBEAFE';
-      borderColor = '#93C5FD';
-      textColor = '#1D4ED8';
+      bg = staffTheme.paleBlue;
+      borderColor = staffTheme.navyTint;
+      textColor = staffTheme.blue;
       label = 'READY FOR PICKUP';
       break;
     case 'EXCEPTION':
-      bg = '#FEE2E2';
-      borderColor = '#FCA5A5';
-      textColor = '#B91C1C';
+      bg = staffTheme.paleRed;
+      borderColor = staffTheme.redLine;
+      textColor = staffTheme.red;
       label = 'EXCEPTION';
       break;
     case 'NO_SHOW':
     case 'NO-SHOW':
-      bg = '#FEF3C7';
-      borderColor = '#FCD34D';
-      textColor = '#B45309';
+      bg = staffTheme.paleAmber;
+      borderColor = staffTheme.amberLine;
+      textColor = staffTheme.amber;
       label = 'NO-SHOW';
       break;
     case 'CANCELLED':
-      bg = '#F1F5F9';
-      borderColor = '#CBD5E1';
-      textColor = '#64748B';
+      bg = staffTheme.canvas;
+      borderColor = staffTheme.line;
+      textColor = staffTheme.muted;
       label = 'CANCELLED';
       break;
     case 'REJECTED':
-      bg = '#FEE2E2';
-      borderColor = '#FCA5A5';
-      textColor = '#DC2626';
+      bg = staffTheme.paleRed;
+      borderColor = staffTheme.redLine;
+      textColor = staffTheme.red;
       label = 'REJECTED';
       break;
     case 'AVAILABLE':
-      bg = '#DCFCE7';
-      borderColor = '#86EFAC';
-      textColor = '#166534';
+      bg = staffTheme.paleGreen;
+      borderColor = staffTheme.greenLine;
+      textColor = staffTheme.green;
       label = 'Available';
       break;
     case 'UNAVAILABLE':
-      bg = '#FEE2E2';
-      borderColor = '#FCA5A5';
-      textColor = '#991B1B';
+      bg = staffTheme.paleRed;
+      borderColor = staffTheme.redLine;
+      textColor = staffTheme.red;
       label = 'Unavailable';
       break;
     case 'UNDER MAINTENANCE':
     case 'IN REPAIR':
-      bg = '#FEF3C7';
-      borderColor = '#FCD34D';
-      textColor = '#92400E';
+      bg = staffTheme.paleAmber;
+      borderColor = staffTheme.amberLine;
+      textColor = staffTheme.amberDeep;
       label = 'Maintenance';
       break;
     default:
-      bg = '#F1F5F9';
-      borderColor = '#E2E8F0';
-      textColor = '#475569';
+      bg = staffTheme.canvas;
+      borderColor = staffTheme.line;
+      textColor = staffTheme.muted;
       label = status;
   }
 

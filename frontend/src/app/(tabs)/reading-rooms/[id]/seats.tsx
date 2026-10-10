@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import Constants from 'expo-constants';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
@@ -15,8 +14,8 @@ import {
  *
  * Data sources (all real, no placeholder occupancy):
  * - Room info:        GET /api/reading-rooms   (matched by route param `id`)
- * - Occupied seats:   GET /api/reservations?readingRoom&date&time
- * - Reserve a seat:   POST /api/reservations   (WF-11)
+ * - Occupied seats:   GET /api/seat-reservations?readingRoom&date&time
+ * - Reserve a seat:   POST /api/seat-reservations   (WF-11)
  * - On success:       navigate to /reservations/[id]/confirmation (WF-12)
  *
  * WF-09 sends `date` as a friendly label ("7 October 2026") for display;
@@ -29,10 +28,10 @@ import {
  * in that range.
  */
 
-// Backend address (same convention as the WF-09 screen): the host the
-// device used to reach Metro, port 5000 = backend default (server.js).
-const API_HOST = Constants.expoConfig?.hostUri?.split(':')[0] ?? 'localhost';
-const API_BASE_URL = `http://${API_HOST}:5000`;
+// Backend address — shared API configuration (src/lib/api.ts): the Expo
+// dev-server host (works on a physical phone) and the backend's port 5000.
+import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
+import { CURRENT_STUDENT_ID } from '@/lib/student-identity';
 
 type ReadingRoom = {
   _id: string;
@@ -54,9 +53,11 @@ type ReservationSummary = {
   status: string;
 };
 
-// Response of POST /api/reservations (only the fields this screen needs).
+// Response of POST /api/seat-reservations and POST /api/seat-reservations/batch
+// (only the fields this screen needs).
 type CreatedReservation = {
   _id?: string;
+  reservationIds?: string[];
   message?: string;
   seatNumber?: number;
   status?: string;
@@ -163,9 +164,10 @@ async function fetchOccupiedSeatsForBlocks(
 }
 
 export default function SeatAvailabilityScreen() {
-  const { id, date } = useLocalSearchParams<{
+  const { id, date, isoDate: isoDateParam } = useLocalSearchParams<{
     id?: string;
     date?: string;
+    isoDate?: string;
   }>();
 
   const [room, setRoom] = useState<ReadingRoom | null>(null);
@@ -185,8 +187,9 @@ export default function SeatAvailabilityScreen() {
   const [saving, setSaving] = useState(false);
   const [reserveError, setReserveError] = useState('');
 
-  // Friendly label from WF-09 -> "YYYY-MM-DD" for the API.
-  const isoDate = date ? toIsoDate(date) : null;
+  // WF-09 sends `isoDate` ("YYYY-MM-DD") for the API; the friendly `date`
+  // label is only a fallback for older links that carry just the label.
+  const isoDate = isoDateParam ?? (date ? toIsoDate(date) : null);
 
   // Load the room (existing WF-09 endpoint) and build its fixed 2-hour
   // time blocks. The first block becomes the default selection.
@@ -327,13 +330,16 @@ export default function SeatAvailabilityScreen() {
     setSelectedSeat((current) => (current === seat ? null : seat));
   };
 
-  // WF-11 — preflight the full range, then create one existing reservation
-  // record per selected 2-hour block.
+  // WF-11 — preflight the selected range, then persist it in ONE request.
+  //
+  // A single block uses POST /api/seat-reservations. A multi-block range
+  // uses POST /api/seat-reservations/batch, which validates every block
+  // first and rolls back on a late failure — so a range can never be left
+  // half-booked (the old per-block loop could).
   const handleReserve = async () => {
     if (
       selectedSeat === null ||
       !room ||
-      !date ||
       !isoDate ||
       selectedTimes.length === 0 ||
       saving
@@ -357,63 +363,61 @@ export default function SeatAvailabilityScreen() {
         return;
       }
 
-      const createdReservations: CreatedReservation[] = [];
+      const isBatch = selectedTimes.length > 1;
+      const endpoint = isBatch
+        ? `${API_BASE_URL}/api/seat-reservations/batch`
+        : `${API_BASE_URL}/api/seat-reservations`;
 
-      for (const block of selectedTimes) {
-        const response = await fetch(`${API_BASE_URL}/api/seat-reservations`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            readingRoom: room._id,
-            date: isoDate,
-            time: block,
-            seatNumber: selectedSeat,
-          }),
-        });
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: CURRENT_STUDENT_ID,
+          readingRoom: room._id,
+          date: isoDate,
+          ...(isBatch
+            ? { blocks: selectedTimes }
+            : { time: selectedTimes[0] }),
+          seatNumber: selectedSeat,
+        }),
+      });
 
-        let data: CreatedReservation | null = null;
-        try {
-          data = (await response.json()) as CreatedReservation;
-        } catch {
-          data = null;
-        }
-
-        if (response.status === 409) {
-          setSelectedSeat(null);
-          if (createdReservations.length === 0) {
-            setReserveError(
-              'One or more selected time blocks are no longer available. Please choose another time.'
-            );
-            return;
-          }
-          throw new Error(
-            `${createdReservations.length} earlier block(s) were saved before a later block became unavailable. Please review My Reservations.`
-          );
-        }
-
-        if (!response.ok || !data || !data._id) {
-          const prefix =
-            createdReservations.length > 0
-              ? `${createdReservations.length} earlier block(s) were saved. `
-              : '';
-          throw new Error(
-            `${prefix}${data?.message ?? `Server responded with status ${response.status}`}`
-          );
-        }
-
-        createdReservations.push(data);
+      let data: CreatedReservation | null = null;
+      try {
+        data = (await response.json()) as CreatedReservation;
+      } catch {
+        data = null;
       }
 
-      const firstReservation = createdReservations[0];
-      if (!firstReservation?._id) {
-        throw new Error('The reservation response did not include a confirmation id.');
+      // 409 — the seat went while we were saving. Refresh the seat map so
+      // the user sees the new reality instead of a stale grid.
+      if (response.status === 409) {
+        setSelectedSeat(null);
+        setReserveError(
+          data?.message ??
+            'One or more selected time blocks are no longer available. Please choose another time.'
+        );
+        const refreshed = await fetchOccupiedSeatsForBlocks(
+          room._id,
+          isoDate,
+          selectedTimes
+        ).catch(() => null);
+        if (refreshed) setReservedSeats(refreshed);
+        return;
       }
+
+      if (!response.ok || !data || !data._id) {
+        throw new Error(
+          data?.message ?? `Server responded with status ${response.status}`
+        );
+      }
+
       // WF-12 — never silently go back: show the confirmation screen.
       router.push({
         pathname: '/reservations/[id]/confirmation',
         params: {
-          id: firstReservation._id,
-          confirmationCode: firstReservation.confirmationCode ?? '',
+          id: data._id,
+          confirmationCode: data.confirmationCode ?? '',
           roomName: room.name,
           building: room.building,
           floor: room.floor,
@@ -421,7 +425,7 @@ export default function SeatAvailabilityScreen() {
           time: formatContinuousRange(selectedTimes),
           blockCount: String(selectedTimes.length),
           seatNumber: String(selectedSeat),
-          status: firstReservation.status ?? 'active',
+          status: data.status ?? 'active',
         },
       });
     } catch (requestError) {

@@ -1,5 +1,8 @@
+import { SymbolView } from 'expo-symbols';
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+
+import { staffTheme } from '../theme/staffTheme';
 
 export type StaffTabName = 'dashboard' | 'reservations' | 'books' | 'room';
 
@@ -17,11 +20,31 @@ export const StaffBottomTabs: React.FC<StaffBottomTabsProps> = ({
   onSelectTab,
   badgeCounts,
 }) => {
-  const tabs: { key: StaffTabName; label: string; icon: string }[] = [
-    { key: 'dashboard', label: 'Dashboard', icon: '📊' },
-    { key: 'reservations', label: 'Reservations', icon: '📋' },
-    { key: 'books', label: 'Books', icon: '📚' },
-    { key: 'room', label: 'Room', icon: '🏛️' },
+  const tabs: {
+    key: StaffTabName;
+    label: string;
+    name: React.ComponentProps<typeof SymbolView>['name'];
+  }[] = [
+    {
+      key: 'dashboard',
+      label: 'Dashboard',
+      name: { ios: 'chart.bar', android: 'assessment', web: 'assessment' },
+    },
+    {
+      key: 'reservations',
+      label: 'Reservations',
+      name: { ios: 'calendar', android: 'calendar_month', web: 'calendar_month' },
+    },
+    {
+      key: 'books',
+      label: 'Books',
+      name: { ios: 'book.closed', android: 'menu_book', web: 'menu_book' },
+    },
+    {
+      key: 'room',
+      label: 'Room',
+      name: { ios: 'building.2', android: 'account_balance', web: 'account_balance' },
+    },
   ];
 
   return (
@@ -37,7 +60,11 @@ export const StaffBottomTabs: React.FC<StaffBottomTabsProps> = ({
             accessibilityRole="tab"
             accessibilityState={{ selected: isActive }}>
             <View style={styles.iconContainer}>
-              <Text style={styles.tabIcon}>{tab.icon}</Text>
+              <SymbolView
+                name={tab.name}
+                tintColor={isActive ? staffTheme.navy : staffTheme.muted}
+                size={20}
+              />
               {tab.key === 'reservations' && (badgeCounts?.exceptions || 0) > 0 && (
                 <View style={styles.badgeDot}>
                   <Text style={styles.badgeDotText}>{badgeCounts?.exceptions}</Text>
@@ -57,9 +84,9 @@ export const StaffBottomTabs: React.FC<StaffBottomTabsProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
+    borderTopColor: staffTheme.line,
     paddingVertical: 8,
     paddingHorizontal: 16,
     justifyContent: 'space-around',
@@ -77,20 +104,19 @@ const styles = StyleSheet.create({
     minWidth: 64,
   },
   activeTabButton: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: staffTheme.paleBlue,
   },
   iconContainer: {
     position: 'relative',
     marginBottom: 2,
-  },
-  tabIcon: {
-    fontSize: 20,
+    height: 24,
+    justifyContent: 'center',
   },
   badgeDot: {
     position: 'absolute',
     top: -4,
     right: -8,
-    backgroundColor: '#EF4444',
+    backgroundColor: staffTheme.red,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -99,17 +125,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   badgeDotText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 9,
     fontWeight: '800',
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#64748B',
+    color: staffTheme.muted,
   },
   activeTabLabel: {
-    color: '#2563EB',
+    color: staffTheme.navy,
     fontWeight: '800',
   },
 });

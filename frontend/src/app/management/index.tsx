@@ -13,7 +13,6 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { ManagementBottomBar } from '@/components/management-bottom-bar';
 
 export default function ManagementLoginScreen() {
   const [username, setUsername] = useState('MGT-4011');
@@ -46,6 +45,9 @@ export default function ManagementLoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
+          <Pressable onPress={() => router.replace('/portal')} accessibilityRole="button" accessibilityLabel="Back to Role Selection" className="px-6 pt-6">
+            <Text className="text-sm font-semibold text-blue-950">Back to Role Selection</Text>
+          </Pressable>
           {/* Top Header Section */}
           <View className="px-6 pt-12">
             <Pressable
@@ -215,8 +217,6 @@ export default function ManagementLoginScreen() {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Bottom Tabs matching design */}
-      <ManagementBottomBar currentTab="overview" />
     </View>
   );
 }

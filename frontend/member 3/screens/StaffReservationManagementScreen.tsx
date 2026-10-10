@@ -13,6 +13,7 @@ import {
 import { StaffHeader } from '../components/StaffHeader';
 import { StaffReservationCard } from '../components/StaffReservationCard';
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { Reservation } from '../types/staff.types';
 
 interface StaffReservationManagementScreenProps {
@@ -32,16 +33,18 @@ export const StaffReservationManagementScreen: React.FC<
   const [refreshing, setRefreshing] = useState(false);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [counts, setCounts] = useState({
-    all: 32,
-    today: 14,
-    exceptions: 3,
+    all: 0,
+    today: 0,
+    exceptions: 0,
   });
+  const [error, setError] = useState('');
 
   const fetchReservations = async () => {
     try {
       const res = await staffApi.getReservations(activeTab, searchQuery, typeFilter);
       if (res.success) {
         setReservations(res.data);
+        setError('');
         if (res.counts) {
           setCounts({
             all: res.counts.all,
@@ -49,9 +52,13 @@ export const StaffReservationManagementScreen: React.FC<
             exceptions: res.counts.exceptions,
           });
         }
+      } else {
+        // Live mode: surface the failure instead of showing fake data.
+        setReservations([]);
+        setError(res.message || 'Failed to load reservations.');
       }
     } catch {
-      // Handled by service fallbacks
+      setError('Failed to load reservations.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -76,6 +83,12 @@ export const StaffReservationManagementScreen: React.FC<
         desk="Circulation Desk 01"
       />
 
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+        </View>
+      ) : null}
+
       {/* Search Input */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBox}>
@@ -83,7 +96,7 @@ export const StaffReservationManagementScreen: React.FC<
           <TextInput
             style={styles.searchInput}
             placeholder="Search by ID, book, seat, or student..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={staffTheme.placeholder}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
@@ -185,7 +198,7 @@ export const StaffReservationManagementScreen: React.FC<
       {/* Reservation List */}
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={staffTheme.navy} />
           <Text style={styles.loadingText}>Fetching reservations...</Text>
         </View>
       ) : (
@@ -222,7 +235,22 @@ export const StaffReservationManagementScreen: React.FC<
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
+  },
+  errorBanner: {
+    backgroundColor: staffTheme.paleRed,
+    borderColor: staffTheme.redLine,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  errorText: {
+    color: staffTheme.red,
+    fontSize: 13,
+    fontWeight: '600',
   },
   searchContainer: {
     paddingHorizontal: 16,
@@ -232,9 +260,9 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 46,
@@ -246,11 +274,11 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: '#0F172A',
+    color: staffTheme.ink,
   },
   clearSearch: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: staffTheme.placeholder,
     padding: 4,
   },
   tabsRow: {
@@ -265,23 +293,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     gap: 6,
   },
   activeTabButton: {
-    backgroundColor: '#1E293B',
-    borderColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
+    borderColor: staffTheme.navy,
   },
   tabText: {
     fontSize: 13,
     fontWeight: '700',
-    color: '#64748B',
+    color: staffTheme.muted,
   },
   activeTabText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
   },
   tabBadge: {
     paddingHorizontal: 6,
@@ -289,26 +317,26 @@ const styles = StyleSheet.create({
     borderRadius: 10,
   },
   inactiveTabBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
   },
   activeTabBadge: {
-    backgroundColor: '#334155',
+    backgroundColor: staffTheme.navySoft,
   },
   tabBadgeText: {
     fontSize: 10,
     fontWeight: '800',
   },
   inactiveTabBadgeText: {
-    color: '#64748B',
+    color: staffTheme.muted,
   },
   activeTabBadgeText: {
-    color: '#F8FAFC',
+    color: staffTheme.canvas,
   },
   exceptionBadge: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: staffTheme.paleRed,
   },
   exceptionBadgeText: {
-    color: '#DC2626',
+    color: staffTheme.red,
     fontSize: 10,
     fontWeight: '800',
   },
@@ -322,18 +350,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
   },
   activeTypeChip: {
-    backgroundColor: '#2563EB',
+    backgroundColor: staffTheme.navy,
   },
   typeChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#64748B',
+    color: staffTheme.muted,
   },
   activeTypeChipText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
   },
   listContent: {
     paddingHorizontal: 16,
@@ -346,7 +374,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
   },
   emptyContainer: {
@@ -361,12 +389,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: staffTheme.ink,
     marginBottom: 4,
   },
   emptySub: {
     fontSize: 13,
-    color: '#64748B',
+    color: staffTheme.muted,
     textAlign: 'center',
   },
 });

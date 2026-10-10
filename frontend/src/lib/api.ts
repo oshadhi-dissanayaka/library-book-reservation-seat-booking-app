@@ -1,13 +1,36 @@
 import Constants from "expo-constants";
 
+/**
+ * Central API configuration — the single source of truth for the backend URL.
+ *
+ * Resolution order:
+ *   1. EXPO_PUBLIC_API_URL  — full base URL including /api, e.g.
+ *        EXPO_PUBLIC_API_URL=http://192.168.1.5:5000/api
+ *      (set it in frontend/.env for a one-off override; no IP is committed)
+ *   2. Expo dev-server host — the LAN address the device used to reach Metro,
+ *      so a physical phone on the same Wi-Fi reaches the backend automatically
+ *   3. localhost            — iOS simulator / web on the same machine
+ *
+ * The default port (5000) matches the backend's configured/default port
+ * (backend/.env PORT=5000, backend/server.js `process.env.PORT || 5000`).
+ */
+const configuredBaseUrl = (process.env.EXPO_PUBLIC_API_URL || "")
+  .trim()
+  .replace(/\/+$/, "");
 const developmentHost = Constants.expoConfig?.hostUri?.split(":")[0];
-const defaultApiUrl = developmentHost
-  ? `http://${developmentHost}:5000/api`
-  : "http://localhost:5000/api";
-const API_BASE_URL = (process.env.EXPO_PUBLIC_API_URL || defaultApiUrl).replace(
-  /\/+$/,
-  ""
-);
+const fallbackOrigin = developmentHost
+  ? `http://${developmentHost}:5000`
+  : "http://localhost:5000";
+
+/** Origin without the /api suffix, e.g. "http://192.168.1.5:5000". */
+export const API_ORIGIN = configuredBaseUrl
+  ? configuredBaseUrl.replace(/\/api$/, "")
+  : fallbackOrigin;
+
+/** Full base URL including /api, e.g. "http://192.168.1.5:5000/api". */
+export const API_BASE = configuredBaseUrl || `${API_ORIGIN}/api`;
+
+const API_BASE_URL = API_BASE;
 
 export type Book = {
   _id: string;

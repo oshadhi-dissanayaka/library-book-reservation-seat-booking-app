@@ -12,6 +12,7 @@ import {
 
 import { StaffHeader } from '../components/StaffHeader';
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { ReadingRoomInfo, Seat } from '../types/staff.types';
 
 interface ReadingRoomOccupancyScreenProps {
@@ -27,15 +28,20 @@ export const ReadingRoomOccupancyScreen: React.FC<
   const [rooms, setRooms] = useState<ReadingRoomInfo[]>([]);
   const [selectedSeat, setSelectedSeat] = useState<Seat | null>(null);
   const [feedback, setFeedback] = useState('');
+  const [error, setError] = useState('');
 
   const fetchOccupancy = async () => {
     try {
       const res = await staffApi.getOccupancy();
       if (res.success) {
         setRooms(res.data.rooms);
+        setError('');
+      } else {
+        setRooms([]);
+        setError(res.message || 'Failed to load reading room occupancy.');
       }
     } catch {
-      // Handled by service fallbacks
+      setError('Failed to load reading room occupancy.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -55,13 +61,17 @@ export const ReadingRoomOccupancyScreen: React.FC<
     if (!selectedSeat) return;
     const newStatus = selectedSeat.status === 'occupied' ? 'available' : 'occupied';
     try {
-      await staffApi.updateSeatStatus(selectedSeat._id, newStatus);
-      setSelectedSeat((prev) => (prev ? { ...prev, status: newStatus } : null));
-      setFeedback(`Seat ${selectedSeat.seatNumber} set to ${newStatus}`);
-      setTimeout(() => setFeedback(''), 3000);
-      fetchOccupancy();
+      const res = await staffApi.updateSeatStatus(selectedSeat._id, newStatus);
+      if (res.success) {
+        setSelectedSeat((prev) => (prev ? { ...prev, status: newStatus } : null));
+        setFeedback(`Seat ${selectedSeat.seatNumber} set to ${newStatus}`);
+        setTimeout(() => setFeedback(''), 3000);
+        fetchOccupancy();
+      } else {
+        setError(res.message || 'Failed to update seat status.');
+      }
     } catch {
-      // Handled
+      setError('Failed to update seat status.');
     }
   };
 
@@ -85,9 +95,15 @@ export const ReadingRoomOccupancyScreen: React.FC<
         </View>
       ) : null}
 
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={staffTheme.navy} />
           <Text style={styles.loadingText}>Fetching seat occupancy map...</Text>
         </View>
       ) : (
@@ -101,9 +117,9 @@ export const ReadingRoomOccupancyScreen: React.FC<
           <View style={styles.roomCard}>
             <View style={styles.roomHeaderRow}>
               <View>
-                <Text style={styles.roomName}>{roomA?.name || 'Reading Room A'}</Text>
+                <Text style={styles.roomName}>{roomA?.name || '—'}</Text>
                 <Text style={styles.roomLocation}>
-                  {roomA?.floor || 'Floor 02'} • {roomA?.wing || 'West Wing'}
+                  {roomA?.floor || '—'} • {roomA?.wing || '—'}
                 </Text>
               </View>
               <View style={styles.liveBadge}>
@@ -114,11 +130,11 @@ export const ReadingRoomOccupancyScreen: React.FC<
 
             <View style={styles.occupancyBarRow}>
               <Text style={styles.occupancyStats}>
-                <Text style={styles.occupiedBold}>{roomA?.occupiedSeats || 18}</Text> /{' '}
-                {roomA?.totalSeats || 30} seats occupied
+                <Text style={styles.occupiedBold}>{roomA?.occupiedSeats ?? 0}</Text> /{' '}
+                {roomA?.totalSeats ?? 0} seats occupied
               </Text>
               <Text style={styles.freeSeatsText}>
-                {roomA?.availableSeats || 12} seats free
+                {roomA?.availableSeats ?? 0} seats free
               </Text>
             </View>
 
@@ -128,9 +144,11 @@ export const ReadingRoomOccupancyScreen: React.FC<
                 style={[
                   styles.progressBarFill,
                   {
-                    width: `${Math.round(
-                      ((roomA?.occupiedSeats || 18) / (roomA?.totalSeats || 30)) * 100
-                    )}%`,
+                    width: `${
+                      roomA && roomA.totalSeats > 0
+                        ? Math.round((roomA.occupiedSeats / roomA.totalSeats) * 100)
+                        : 0
+                    }%`,
                   },
                 ]}
               />
@@ -146,6 +164,10 @@ export const ReadingRoomOccupancyScreen: React.FC<
                 <Text style={styles.legendLabel}>Occupied</Text>
               </View>
               <View style={styles.legendItem}>
+                <View style={[styles.legendBox, styles.reservedBox]} />
+                <Text style={styles.legendLabel}>Reserved</Text>
+              </View>
+              <View style={styles.legendItem}>
                 <View style={[styles.legendBox, styles.availableBox]} />
                 <Text style={styles.legendLabel}>Available</Text>
               </View>
@@ -159,19 +181,28 @@ export const ReadingRoomOccupancyScreen: React.FC<
             <View style={styles.seatGrid}>
               {seatsList.map((seat) => {
                 const isOccupied = seat.status === 'occupied';
+                const isReserved = seat.status === 'reserved';
                 return (
                   <TouchableOpacity
                     key={seat._id || seat.seatNumber}
                     style={[
                       styles.seatBtn,
-                      isOccupied ? styles.seatOccupied : styles.seatAvailable,
+                      isOccupied
+                        ? styles.seatOccupied
+                        : isReserved
+                          ? styles.seatReserved
+                          : styles.seatAvailable,
                     ]}
                     onPress={() => setSelectedSeat(seat)}
                     activeOpacity={0.7}>
                     <Text
                       style={[
                         styles.seatNumberText,
-                        isOccupied ? styles.textOccupied : styles.textAvailable,
+                        isOccupied
+                          ? styles.textOccupied
+                          : isReserved
+                            ? styles.textReserved
+                            : styles.textAvailable,
                       ]}>
                       {seat.seatNumber}
                     </Text>
@@ -185,9 +216,9 @@ export const ReadingRoomOccupancyScreen: React.FC<
           <View style={styles.roomCard}>
             <View style={styles.roomHeaderRow}>
               <View>
-                <Text style={styles.roomName}>{roomB?.name || 'Reading Room B'}</Text>
+                <Text style={styles.roomName}>{roomB?.name || '—'}</Text>
                 <Text style={styles.roomLocation}>
-                  {roomB?.floor || 'Floor 02'} • {roomB?.wing || 'East Wing'}
+                  {roomB?.floor || '—'} • {roomB?.wing || '—'}
                 </Text>
               </View>
               <View style={styles.quietBadge}>
@@ -197,16 +228,27 @@ export const ReadingRoomOccupancyScreen: React.FC<
 
             <View style={styles.occupancyBarRow}>
               <Text style={styles.occupancyStats}>
-                <Text style={styles.occupiedBold}>{roomB?.occupiedSeats || 0}</Text> /{' '}
-                {roomB?.totalSeats || 20} seats occupied
+                <Text style={styles.occupiedBold}>{roomB?.occupiedSeats ?? 0}</Text> /{' '}
+                {roomB?.totalSeats ?? 0} seats occupied
               </Text>
               <Text style={styles.freeSeatsText}>
-                {roomB?.availableSeats || 20} seats free
+                {roomB?.availableSeats ?? 0} seats free
               </Text>
             </View>
 
             <View style={styles.progressBarTrack}>
-              <View style={[styles.progressBarFill, { width: '0%' }]} />
+              <View
+                style={[
+                  styles.progressBarFill,
+                  {
+                    width: `${
+                      roomB && roomB.totalSeats > 0
+                        ? Math.round((roomB.occupiedSeats / roomB.totalSeats) * 100)
+                        : 0
+                    }%`,
+                  },
+                ]}
+              />
             </View>
           </View>
 
@@ -242,14 +284,18 @@ export const ReadingRoomOccupancyScreen: React.FC<
                   styles.statusBadgeSmall,
                   selectedSeat?.status === 'occupied'
                     ? styles.badgeOccupied
-                    : styles.badgeAvailable,
+                    : selectedSeat?.status === 'reserved'
+                      ? styles.badgeReserved
+                      : styles.badgeAvailable,
                 ]}>
                 <Text
                   style={[
                     styles.statusBadgeSmallText,
                     selectedSeat?.status === 'occupied'
                       ? styles.badgeOccupiedText
-                      : styles.badgeAvailableText,
+                      : selectedSeat?.status === 'reserved'
+                        ? styles.badgeReservedText
+                        : styles.badgeAvailableText,
                   ]}>
                   {selectedSeat?.status.toUpperCase()}
                 </Text>
@@ -257,21 +303,34 @@ export const ReadingRoomOccupancyScreen: React.FC<
             </View>
 
             <Text style={styles.seatModalRoom}>
-              {selectedSeat?.room} • Floor 02
+              {selectedSeat?.room}
+              {selectedSeat?.floor ? ` • ${selectedSeat.floor}` : ''}
             </Text>
 
-            {selectedSeat?.occupiedBy?.studentName ? (
+            {selectedSeat?.occupiedBy?.studentName ||
+            selectedSeat?.occupiedBy?.studentId ? (
               <View style={styles.occupantCard}>
-                <Text style={styles.occupantLabel}>CURRENT OCCUPANT</Text>
-                <Text style={styles.occupantName}>
-                  {selectedSeat.occupiedBy.studentName}
+                <Text style={styles.occupantLabel}>
+                  {selectedSeat?.status === 'reserved'
+                    ? 'RESERVED FOR'
+                    : 'CURRENT OCCUPANT'}
                 </Text>
+                {selectedSeat?.occupiedBy?.studentName ? (
+                  <Text style={styles.occupantName}>
+                    {selectedSeat.occupiedBy.studentName}
+                  </Text>
+                ) : null}
                 <Text style={styles.occupantMeta}>
-                  Student ID: {selectedSeat.occupiedBy.studentId}
+                  Student ID: {selectedSeat?.occupiedBy?.studentId}
                 </Text>
-                <Text style={styles.occupantMeta}>
-                  Time Slot: {selectedSeat.occupiedBy.startTime} - {selectedSeat.occupiedBy.endTime}
-                </Text>
+                {selectedSeat?.occupiedBy?.startTime ? (
+                  <Text style={styles.occupantMeta}>
+                    Time Slot: {selectedSeat.occupiedBy.startTime}
+                    {selectedSeat.occupiedBy.endTime
+                      ? ` - ${selectedSeat.occupiedBy.endTime}`
+                      : ''}
+                  </Text>
+                ) : null}
               </View>
             ) : (
               <View style={styles.availableDeskNotice}>
@@ -307,17 +366,28 @@ export const ReadingRoomOccupancyScreen: React.FC<
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
   },
   feedbackBanner: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: staffTheme.paleGreen,
     padding: 12,
     borderBottomWidth: 1,
-    borderColor: '#86EFAC',
+    borderColor: staffTheme.greenLine,
     alignItems: 'center',
   },
   feedbackText: {
-    color: '#15803D',
+    color: staffTheme.green,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  errorBanner: {
+    backgroundColor: staffTheme.paleRed,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderColor: staffTheme.redLine,
+  },
+  errorText: {
+    color: staffTheme.red,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -336,16 +406,16 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
   },
   roomCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 18,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -359,19 +429,19 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   roomName: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 18,
     fontWeight: '800',
   },
   roomLocation: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
     marginTop: 2,
   },
   liveBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: staffTheme.paleBlue,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
@@ -380,22 +450,22 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#2563EB',
+    backgroundColor: staffTheme.navy,
     marginRight: 6,
   },
   liveText: {
-    color: '#2563EB',
+    color: staffTheme.navy,
     fontSize: 10,
     fontWeight: '800',
   },
   quietBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
   },
   quietText: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 10,
     fontWeight: '800',
   },
@@ -406,32 +476,32 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   occupancyStats: {
-    color: '#334155',
+    color: staffTheme.ink,
     fontSize: 14,
   },
   occupiedBold: {
     fontWeight: '800',
-    color: '#0F172A',
+    color: staffTheme.ink,
   },
   freeSeatsText: {
-    color: '#16A34A',
+    color: staffTheme.green,
     fontSize: 13,
     fontWeight: '700',
   },
   progressBarTrack: {
     height: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
     borderRadius: 4,
     overflow: 'hidden',
     marginBottom: 16,
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: '#2563EB',
+    backgroundColor: staffTheme.navy,
     borderRadius: 4,
   },
   matrixTitle: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -453,18 +523,23 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   occupiedBox: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
+  },
+  reservedBox: {
+    backgroundColor: staffTheme.paleAmber,
+    borderWidth: 1,
+    borderColor: staffTheme.amberLine,
   },
   availableBox: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: staffTheme.seatFreeBg,
     borderWidth: 1,
-    borderColor: '#86EFAC',
+    borderColor: staffTheme.seatFreeLine,
   },
   selectedBox: {
-    backgroundColor: '#3B82F6',
+    backgroundColor: staffTheme.blue,
   },
   legendLabel: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '600',
   },
@@ -483,25 +558,32 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   seatOccupied: {
-    backgroundColor: '#1E293B',
-    borderColor: '#0F172A',
+    backgroundColor: staffTheme.navy,
+    borderColor: staffTheme.navy,
+  },
+  seatReserved: {
+    backgroundColor: staffTheme.paleAmber,
+    borderColor: staffTheme.amberLine,
   },
   seatAvailable: {
-    backgroundColor: '#DCFCE7',
-    borderColor: '#86EFAC',
+    backgroundColor: staffTheme.seatFreeBg,
+    borderColor: staffTheme.seatFreeLine,
   },
   seatNumberText: {
     fontSize: 11,
     fontWeight: '800',
   },
   textOccupied: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
+  },
+  textReserved: {
+    color: staffTheme.amber,
   },
   textAvailable: {
-    color: '#166534',
+    color: staffTheme.ink,
   },
   noShowsNavButton: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
     borderRadius: 16,
     padding: 18,
     alignItems: 'center',
@@ -516,13 +598,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   noShowsBtnTitle: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 15,
     fontWeight: '800',
     marginBottom: 4,
   },
   noShowsBtnSub: {
-    color: '#94A3B8',
+    color: staffTheme.navyCopy,
     fontSize: 12,
   },
   modalBackdrop: {
@@ -535,7 +617,7 @@ const styles = StyleSheet.create({
   seatModalCard: {
     width: '100%',
     maxWidth: 380,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 20,
     padding: 24,
   },
@@ -546,7 +628,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   seatModalTitle: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 20,
     fontWeight: '800',
   },
@@ -556,72 +638,80 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   badgeOccupied: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: staffTheme.navy,
   },
   badgeOccupiedText: {
-    color: '#DC2626',
+    color: staffTheme.white,
     fontWeight: '700',
     fontSize: 11,
   },
   badgeAvailable: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: staffTheme.paleGreen,
   },
   badgeAvailableText: {
-    color: '#16A34A',
+    color: staffTheme.green,
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  badgeReserved: {
+    backgroundColor: staffTheme.paleAmber,
+  },
+  badgeReservedText: {
+    color: staffTheme.amber,
     fontWeight: '700',
     fontSize: 11,
   },
   statusBadgeSmallText: {},
   seatModalRoom: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 13,
     marginBottom: 16,
   },
   occupantCard: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
     borderRadius: 12,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
   },
   occupantLabel: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.6,
     marginBottom: 4,
   },
   occupantName: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '700',
     marginBottom: 2,
   },
   occupantMeta: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 12,
   },
   availableDeskNotice: {
-    backgroundColor: '#F0FDF4',
+    backgroundColor: staffTheme.paleGreen,
     borderRadius: 12,
     padding: 14,
     marginBottom: 16,
   },
   availableNoticeText: {
-    color: '#166534',
+    color: staffTheme.green,
     fontSize: 13,
     lineHeight: 18,
   },
   toggleSeatBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: staffTheme.navy,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     marginBottom: 8,
   },
   toggleSeatText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 14,
     fontWeight: '700',
   },
@@ -630,7 +720,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeSeatText: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 13,
     fontWeight: '700',
   },

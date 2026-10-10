@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { staffTheme } from '../theme/staffTheme';
+
 interface StaffHeaderProps {
   title: string;
   subtitle?: string;
@@ -56,7 +58,7 @@ export const StaffHeader: React.FC<StaffHeaderProps> = ({
 
 const styles = StyleSheet.create({
   container: {
-    backgroundColor: '#0F172A',
+    backgroundColor: staffTheme.navy,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
@@ -75,55 +77,55 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   portalPill: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navySoft,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: staffTheme.navyLine,
   },
   portalPillText: {
-    color: '#38BDF8',
+    color: staffTheme.navyTint,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
   deskText: {
-    color: '#94A3B8',
+    color: staffTheme.navyCopy,
     fontSize: 12,
   },
   backButton: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navySoft,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: staffTheme.navyLine,
   },
   backText: {
-    color: '#F8FAFC',
+    color: staffTheme.canvas,
     fontSize: 13,
     fontWeight: '600',
   },
   userBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navySoft,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: staffTheme.navyLine,
   },
   onlineDot: {
     width: 7,
     height: 7,
     borderRadius: 4,
-    backgroundColor: '#22C55E',
+    backgroundColor: staffTheme.liveDot,
     marginRight: 6,
   },
   userIdText: {
-    color: '#E2E8F0',
+    color: staffTheme.navyCopy,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -131,13 +133,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   title: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 24,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   subtitle: {
-    color: '#94A3B8',
+    color: staffTheme.navyCopy,
     fontSize: 13,
     marginTop: 2,
   },

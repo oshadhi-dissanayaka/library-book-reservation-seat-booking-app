@@ -14,6 +14,7 @@ import {
 import { StaffHeader } from '../components/StaffHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { Book, BookStatus } from '../types/staff.types';
 
 interface BookAvailabilityManagementScreenProps {
@@ -28,6 +29,7 @@ export const BookAvailabilityManagementScreen: React.FC<
   const [refreshing, setRefreshing] = useState(false);
   const [search, setSearch] = useState('');
   const [feedback, setFeedback] = useState('');
+  const [error, setError] = useState('');
 
   // Selected book for editing
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
@@ -42,9 +44,13 @@ export const BookAvailabilityManagementScreen: React.FC<
       const res = await staffApi.getBooks(search);
       if (res.success) {
         setBooks(res.data);
+        setError('');
+      } else {
+        setBooks([]);
+        setError(res.message || 'Failed to load books.');
       }
     } catch {
-      // Handled by service
+      setError('Failed to load books.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -87,9 +93,11 @@ export const BookAvailabilityManagementScreen: React.FC<
         setSelectedBook(null);
         setFeedback(`Availability updated for "${res.data.title}"`);
         setTimeout(() => setFeedback(''), 3500);
+      } else {
+        setError(res.message || 'Failed to update book availability.');
       }
     } catch {
-      // Handled
+      setError('Failed to update book availability.');
     } finally {
       setUpdating(false);
     }
@@ -110,6 +118,12 @@ export const BookAvailabilityManagementScreen: React.FC<
         </View>
       ) : null}
 
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+        </View>
+      ) : null}
+
       {/* Search Input */}
       <View style={styles.searchContainer}>
         <View style={styles.searchBox}>
@@ -117,7 +131,7 @@ export const BookAvailabilityManagementScreen: React.FC<
           <TextInput
             style={styles.searchInput}
             placeholder="Search catalog titles, author, shelf..."
-            placeholderTextColor="#94A3B8"
+            placeholderTextColor={staffTheme.placeholder}
             value={search}
             onChangeText={setSearch}
           />
@@ -137,7 +151,7 @@ export const BookAvailabilityManagementScreen: React.FC<
 
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={staffTheme.navy} />
           <Text style={styles.loadingText}>Loading book catalog...</Text>
         </View>
       ) : (
@@ -245,7 +259,7 @@ export const BookAvailabilityManagementScreen: React.FC<
                 style={styles.stepperBtn}
                 onPress={() =>
                   setEditCopies(
-                    Math.min(selectedBook?.totalCopies || 10, editCopies + 1)
+                    Math.min(selectedBook?.totalCopies ?? 0, editCopies + 1)
                   )
                 }>
                 <Text style={styles.stepperBtnText}>+</Text>
@@ -277,7 +291,7 @@ export const BookAvailabilityManagementScreen: React.FC<
               disabled={updating}
               activeOpacity={0.8}>
               {updating ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={staffTheme.white} />
               ) : (
                 <Text style={styles.saveBtnText}>UPDATE AVAILABILITY</Text>
               )}
@@ -299,17 +313,28 @@ export const BookAvailabilityManagementScreen: React.FC<
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
   },
   feedbackBanner: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: staffTheme.paleGreen,
     padding: 12,
     borderBottomWidth: 1,
-    borderColor: '#86EFAC',
+    borderColor: staffTheme.greenLine,
     alignItems: 'center',
   },
   feedbackText: {
-    color: '#15803D',
+    color: staffTheme.green,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  errorBanner: {
+    backgroundColor: staffTheme.paleRed,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderColor: staffTheme.redLine,
+  },
+  errorText: {
+    color: staffTheme.red,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -321,9 +346,9 @@ const styles = StyleSheet.create({
   searchBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     borderRadius: 12,
     paddingHorizontal: 12,
     height: 46,
@@ -335,11 +360,11 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 14,
-    color: '#0F172A',
+    color: staffTheme.ink,
   },
   clearSearch: {
     fontSize: 14,
-    color: '#94A3B8',
+    color: staffTheme.placeholder,
     padding: 4,
   },
   counterRow: {
@@ -349,7 +374,7 @@ const styles = StyleSheet.create({
   counterText: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#64748B',
+    color: staffTheme.muted,
     letterSpacing: 0.8,
   },
   listContent: {
@@ -363,16 +388,16 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
   },
   bookCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -390,13 +415,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   bookTitle: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 16,
     fontWeight: '800',
     marginBottom: 2,
   },
   bookAuthor: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
   },
   shelfRow: {
@@ -405,12 +430,12 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   shelfLabel: {
-    color: '#94A3B8',
+    color: staffTheme.muted,
     fontSize: 12,
     marginRight: 6,
   },
   shelfValue: {
-    color: '#1E293B',
+    color: staffTheme.ink,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -419,46 +444,46 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: staffTheme.canvas,
     paddingTop: 10,
     marginTop: 2,
   },
   stockIndicator: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
   stockText: {
-    color: '#334155',
+    color: staffTheme.ink,
     fontSize: 12,
     fontWeight: '600',
   },
   changeBtn: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 8,
   },
   changeBtnText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 12,
     fontWeight: '700',
   },
   notesBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: staffTheme.paleRed,
     padding: 8,
     borderRadius: 8,
     marginTop: 10,
   },
   notesLabel: {
-    color: '#991B1B',
+    color: staffTheme.red,
     fontSize: 10,
     fontWeight: '800',
     marginBottom: 2,
   },
   notesText: {
-    color: '#B91C1C',
+    color: staffTheme.red,
     fontSize: 11,
   },
   modalBackdrop: {
@@ -467,26 +492,26 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   editorSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 40,
   },
   sheetTitle: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 18,
     fontWeight: '800',
   },
   sheetSub: {
-    color: '#2563EB',
+    color: staffTheme.navy,
     fontSize: 13,
     fontWeight: '700',
     marginTop: 2,
     marginBottom: 16,
   },
   fieldLabel: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.6,
@@ -502,22 +527,22 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 10,
     borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
   },
   activeStatusOptionBtn: {
-    backgroundColor: '#1E293B',
-    borderColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
+    borderColor: staffTheme.navy,
   },
   statusOptionText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#475569',
+    color: staffTheme.muted,
   },
   activeStatusOptionText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
   },
   stepperRow: {
     flexDirection: 'row',
@@ -529,49 +554,49 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
   },
   stepperBtnText: {
     fontSize: 20,
     fontWeight: '800',
-    color: '#0F172A',
+    color: staffTheme.ink,
   },
   stepperValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: '#0F172A',
+    color: staffTheme.ink,
     minWidth: 32,
     textAlign: 'center',
   },
   inputField: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
     fontSize: 13,
-    color: '#0F172A',
+    color: staffTheme.ink,
     marginBottom: 6,
   },
   saveBtn: {
-    backgroundColor: '#2563EB',
+    backgroundColor: staffTheme.navy,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     marginTop: 18,
-    shadowColor: '#2563EB',
+    shadowColor: staffTheme.navy,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   saveBtnText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -582,7 +607,7 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   cancelBtnText: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 13,
     fontWeight: '700',
   },

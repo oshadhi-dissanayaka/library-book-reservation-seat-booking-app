@@ -6,12 +6,9 @@ import { StaffRootNavigator } from '../../../member 3/screens/StaffRootNavigator
 export default function StaffEntryRoute() {
   return (
     <StaffRootNavigator
+      initialLoggedIn={false}
       onBackToPortal={() => {
-        if (router.canGoBack()) {
-          router.back();
-        } else {
-          router.replace('/' as any);
-        }
+        router.replace('/portal');
       }}
     />
   );
