@@ -31,7 +31,7 @@ import {
 // Backend address — shared API configuration (src/lib/api.ts): the Expo
 // dev-server host (works on a physical phone) and the backend's port 5000.
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
-import { CURRENT_STUDENT_ID } from '@/lib/student-identity';
+import { currentStudentId } from '@/lib/student-identity';
 
 type ReadingRoom = {
   _id: string;
@@ -372,7 +372,7 @@ export default function SeatAvailabilityScreen() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          studentId: CURRENT_STUDENT_ID,
+          studentId: currentStudentId(),
           readingRoom: room._id,
           date: isoDate,
           ...(isBatch

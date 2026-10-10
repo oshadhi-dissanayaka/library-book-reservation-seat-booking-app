@@ -26,22 +26,27 @@ type ScreenView =
 interface StaffRootNavigatorProps {
   onBackToPortal?: () => void;
   initialLoggedIn?: boolean;
+  /** Signed-in staff identity restored from the stored session (if any). */
+  initialUser?: StaffUser | null;
 }
 
 export const StaffRootNavigator: React.FC<StaffRootNavigatorProps> = ({
   onBackToPortal,
   initialLoggedIn = true,
+  initialUser = null,
 }) => {
   const [currentView, setCurrentView] = useState<ScreenView>(
     initialLoggedIn ? 'dashboard' : 'login'
   );
-  const [currentUser, setCurrentUser] = useState<StaffUser | null>({
-    staffId: 'STF-4092',
-    name: 'Circulation Desk Officer',
-    role: 'Library Staff',
-    desk: 'Circulation Desk 01',
-    shift: '08:00 - 17:00',
-  });
+  const [currentUser, setCurrentUser] = useState<StaffUser | null>(
+    initialUser ?? {
+      staffId: 'STF-4092',
+      name: 'Circulation Desk Officer',
+      role: 'Library Staff',
+      desk: 'Circulation Desk 01',
+      shift: '08:00 - 17:00',
+    }
+  );
   const [activeTab, setActiveTab] = useState<StaffTabName>('dashboard');
   const [selectedReservation, setSelectedReservation] =
     useState<Reservation | null>(null);

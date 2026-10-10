@@ -5,14 +5,16 @@ import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { isOnboardingComplete, resetOnboarding } from '@/lib/portal-session';
+import { AuthHomeRoute, homeRouteForRole, loadAuthSession } from '@/lib/auth-session';
 
 /**
  * SCREEN A — Branded launch splash (route "/").
  *
  * Shown on every cold launch. After a short timed fade it hands off to:
+ *   - the signed-in role's dashboard when a valid session exists (a logged-in
+ *     user never sees the role-selection gateway again)
  *   - /onboarding  (first launch, onboarding not completed yet)
- *   - /portal      (every launch after onboarding — always show the
- *                   role-selection gateway, even with a saved session)
+ *   - /portal      (onboarding done, nobody signed in)
  *
  * Development reset: tap the institutional footer 5 times to clear the
  * onboarding flag and re-enter the onboarding flow. No settings screen.
@@ -21,21 +23,23 @@ import { isOnboardingComplete, resetOnboarding } from '@/lib/portal-session';
 const SPLASH_MIN_MS = 1800;
 const DEV_TAP_COUNT = 5;
 
-type SplashDestination = '/onboarding' | '/portal';
+type SplashDestination = '/onboarding' | '/portal' | AuthHomeRoute;
 
 /**
- * Launch decision. Reads the persisted onboarding flag, then resolves to
- * exactly one destination:
+ * Launch decision. Reads the stored auth session first, then the onboarding
+ * flag, and resolves to exactly one destination:
  *
- *   1. onboarding not complete  -> /onboarding
- *   2. otherwise                -> /portal  (ALWAYS show the role-selection
- *                                           gateway, even with a saved session)
- *
- * A saved portal session no longer short-circuits to /home — it only
- * prefills the login form on the portal. Staff/Management remain separate,
- * privileged gateways chosen manually from the portal.
+ *   1. valid session                    -> role destination
+ *        student / academic_staff       -> /home
+ *        library_staff                  -> /staff (staff dashboard)
+ *        management                     -> /management/library-overview
+ *   2. onboarding not complete          -> /onboarding
+ *   3. otherwise                        -> /portal
  */
 async function decideLaunchDestination(): Promise<SplashDestination> {
+  const session = await loadAuthSession();
+  if (session) return homeRouteForRole(session.user.role);
+
   const onboardingDone = await isOnboardingComplete();
   if (!onboardingDone) return '/onboarding';
   return '/portal';

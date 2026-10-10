@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 
+import { saveAuthSession } from '@/lib/auth-session';
 import { staffApi } from '../services/staffApi';
 import { staffTheme } from '../theme/staffTheme';
 import { StaffUser } from '../types/staff.types';
@@ -26,7 +27,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
   onLoginSuccess,
   onBackToPortal,
 }) => {
-  const [username, setUsername] = useState('STF-4092');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -36,6 +37,10 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
       setError('Please enter your Staff ID');
       return;
     }
+    if (!password) {
+      setError('Please enter your password');
+      return;
+    }
 
     setLoading(true);
     setError('');
@@ -43,6 +48,19 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
     try {
       const result = await staffApi.login(username, password);
       if (result.success) {
+        // Persist the real session (JWT + user) so relaunches land on the
+        // staff dashboard and protected calls can send the bearer token.
+        if (result.data.token) {
+          await saveAuthSession({
+            token: result.data.token,
+            user: {
+              institutionalId: result.data.staffId,
+              name: result.data.name,
+              email: result.data.email ?? '',
+              role: 'library_staff',
+            },
+          });
+        }
         onLoginSuccess(result.data);
       } else {
         setError(result.message || 'Authentication failed. Please verify credentials.');
@@ -96,7 +114,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
             ) : null}
 
             <View style={styles.field}>
-              <Text style={styles.label}>Username / Staff ID</Text>
+              <Text style={styles.label}>Library Staff ID</Text>
               <TextInput
                 style={styles.input}
                 value={username}
@@ -104,7 +122,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
                   setUsername(t);
                   setError('');
                 }}
-                placeholder="Enter Staff ID (e.g. STF-4092)"
+                placeholder="Enter Staff ID (e.g. LIB001)"
                 placeholderTextColor={staffTheme.placeholder}
                 autoCapitalize="characters"
               />
@@ -138,10 +156,13 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
             </TouchableOpacity>
 
             <View style={styles.hintBox}>
-              <Text style={styles.hintTitle}>Staff Terminal Credentials:</Text>
-              <Text style={styles.hintCode}>ID: STF-4092 | Role: Circulation Desk</Text>
+              <Text style={styles.hintTitle}>No staff self-signup:</Text>
+              <Text style={styles.hintCode}>
+                Library Staff accounts are issued by University Management.
+              </Text>
               <Text style={styles.hintSub}>
-                Authorized campus library staff credentials required to access circulation queues and resource status.
+                Sign in with the Library Staff ID and temporary password you were issued. You will
+                be asked to keep using it with your own password.
               </Text>
             </View>
           </View>

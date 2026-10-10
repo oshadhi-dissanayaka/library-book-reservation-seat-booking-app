@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Reservation, reservationsApi } from '@/lib/api';
+import { getCurrentUser, loadAuthSession } from '@/lib/auth-session';
 import { formatDateTime, formatPickupDate, getPickupDateOptions } from '@/lib/dates';
 
 const palette = {
@@ -47,7 +48,22 @@ const getDateKey = (date: Date) =>
 export default function ReservationsScreen() {
   const params = useLocalSearchParams<{ patronId?: string }>();
   const linkedPatronId = Array.isArray(params.patronId) ? params.patronId[0] : params.patronId;
-  const [patronId, setPatronId] = useState(linkedPatronId || '');
+  const [patronId, setPatronId] = useState(
+    linkedPatronId || getCurrentUser()?.institutionalId || ''
+  );
+
+  // Prefill the signed-in user's institutional id when no ?patronId param was
+  // pushed (auth session is the source of the patron id for reservations).
+  useEffect(() => {
+    let mounted = true;
+    void loadAuthSession().then((session) => {
+      if (!mounted || !session || linkedPatronId) return;
+      setPatronId((current: string) => current || session.user.institutionalId);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [linkedPatronId]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
   const [activeTab, setActiveTab] = useState<'active' | 'history'>('active');
   const [dateFilter, setDateFilter] = useState<ReservationDateFilter>('all');

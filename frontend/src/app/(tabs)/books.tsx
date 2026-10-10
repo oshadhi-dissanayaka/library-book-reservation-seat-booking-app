@@ -18,6 +18,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Book, Reservation, booksApi, reservationsApi } from '@/lib/api';
+import { getCurrentUser, loadAuthSession } from '@/lib/auth-session';
 import { formatDateTime, formatPickupDateTime, getPickupDateOptions } from '@/lib/dates';
 
 const palette = {
@@ -53,7 +54,7 @@ export default function BookSearchScreen() {
   const [error, setError] = useState('');
   const [selectedBook, setSelectedBook] = useState<Book | null>(null);
   const [booking, setBooking] = useState(false);
-  const [patronId, setPatronId] = useState('');
+  const [patronId, setPatronId] = useState(() => getCurrentUser()?.institutionalId ?? '');
   const [pickupDate, setPickupDate] = useState(pickupDates[0].value);
   const [pickupHour, setPickupHour] = useState('09');
   const [pickupMinute, setPickupMinute] = useState('00');
@@ -95,6 +96,22 @@ export default function BookSearchScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [createdReservation, setCreatedReservation] = useState<Reservation | null>(null);
+
+  // The signed-in student / academic staff institutional id is the patron id
+  // stamped on new book reservations (falls back to an empty field the user
+  // can still fill in manually).
+  useEffect(() => {
+    let mounted = true;
+    void loadAuthSession().then((session) => {
+      if (mounted && session && !patronId) {
+        setPatronId(session.user.institutionalId);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const loadBooks = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
