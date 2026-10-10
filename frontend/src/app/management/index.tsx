@@ -89,10 +89,7 @@ export default function ManagementLoginScreen() {
               <Text className="ml-1.5 text-xs font-semibold text-blue-900">Portal Gateways</Text>
             </Pressable>
 
-            <View className="flex-row items-center rounded-full bg-blue-50 px-3 py-1 border border-blue-200">
-              <View className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5" />
-              <Text className="text-[10px] font-bold tracking-wider text-blue-900">SYSTEM SECURE</Text>
-            </View>
+           
           </View>
 
           <View className="items-center px-6 pt-3">
@@ -260,23 +257,7 @@ export default function ManagementLoginScreen() {
               )}
             </Pressable>
 
-            {/* Quick Demo Credentials Pill */}
-            <Pressable
-              onPress={() => {
-                setInstitutionalId('MGT001');
-                setPassword('Admin@123');
-                setError('');
-              }}
-              className="mt-3.5 flex-row items-center justify-between rounded-xl bg-blue-50 px-3.5 py-2.5 border border-blue-200 active:opacity-70"
-            >
-              <View className="flex-row items-center">
-                <Ionicons name="sparkles" size={14} color="#1E3A8A" />
-                <Text className="ml-2 text-xs font-semibold text-blue-950">
-                  Demo Account: <Text className="font-bold">MGT001</Text>
-                </Text>
-              </View>
-              <Text className="text-xs font-bold text-blue-700">Tap to Auto-fill</Text>
-            </Pressable>
+            
 
             {/* Information Card */}
             <View className="mt-4 flex-row items-start rounded-2xl bg-slate-50 p-4 border border-slate-200">
@@ -286,18 +267,7 @@ export default function ManagementLoginScreen() {
               </Text>
             </View>
 
-            {/* SSL Footer Notice */}
-            <View className="mt-6 items-center">
-              <View className="flex-row items-center">
-                <Ionicons name="lock-closed" size={13} color="#94A3B8" />
-                <Text className="ml-1 text-xs text-slate-500">
-                  Strict SSL / TLS 1.3 Encryption
-                </Text>
-              </View>
-              <Text className="mt-0.5 text-[11px] text-slate-500">
-                Institutional Library Services Network
-              </Text>
-            </View>
+           
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
