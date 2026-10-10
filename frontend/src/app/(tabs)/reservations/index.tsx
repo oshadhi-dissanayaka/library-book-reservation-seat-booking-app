@@ -10,24 +10,16 @@ import {
 } from 'react-native';
 
 /**
- * WF-13 — My Reservations (IT3060 HCI Milestone 03)
+ * WF-13 - My Seat Reservations (IT3060 HCI Milestone 03)
  *
  * Lists the CURRENT student's seat reservations:
  *   GET /api/seat-reservations?studentId=...  -> this student's records
  *   GET /api/reading-rooms                    -> room name / building / floor
- * Reservations store `readingRoom` as an id only, so the two lists
- * are joined on the client.
- *
- * The list reloads every time the screen gains focus, so a booking made on
- * WF-11 or a cancellation made on WF-14 appears immediately on return.
- *
- * Tapping a card opens WF-14 (Reservation Details): /reservations/[id]
  */
 
-// Backend address — shared API configuration (src/lib/api.ts): the Expo
-// dev-server host (works on a physical phone) and the backend's port 5000.
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
 import { studentIdQuery } from '@/lib/student-identity';
+import { ReservationStatusBadge, M2EmptyState } from '@/components/m2';
 
 type Reservation = {
   _id: string;
@@ -51,7 +43,6 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-/** "2026-10-16" -> "16 October 2026" (no date library needed). */
 function formatIsoDate(value: string): string {
   const parts = value.split('-');
   if (parts.length !== 3) return value;
@@ -60,15 +51,8 @@ function formatIsoDate(value: string): string {
   return `${Number(parts[2])} ${MONTH_NAMES[monthIndex]} ${parts[0]}`;
 }
 
-/** Same formula the POST response used in STEP 7: RES-SEAT-XXXX. */
 function confirmationCodeFor(id: string): string {
   return `RES-SEAT-${id.slice(-4).toUpperCase()}`;
-}
-
-function statusLabel(status: string): string {
-  if (status === 'active') return 'Active';
-  if (status === 'cancelled') return 'Cancelled';
-  return status;
 }
 
 export default function MyReservationsScreen() {
@@ -77,17 +61,13 @@ export default function MyReservationsScreen() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  // useFocusEffect (not useEffect) so the list refreshes whenever the user
-  // returns here after booking on WF-11 or cancelling on WF-14.
   useFocusEffect(
     useCallback(() => {
       let active = true;
-
       const loadData = async () => {
         setLoading(true);
         setError('');
         try {
-          // 1. THIS student's reservations (active + cancelled).
           const reservationsResponse = await fetch(
             `${API_BASE_URL}/api/seat-reservations?${studentIdQuery()}`
           );
@@ -100,141 +80,160 @@ export default function MyReservationsScreen() {
               Array.isArray(reservationsData.reservations) ? reservationsData.reservations : []
             );
           }
-
-          // 2. Room display info (existing WF-09 endpoint, best effort —
-          //    the list still works if this one fails).
           try {
             const roomsResponse = await fetch(`${API_BASE_URL}/api/reading-rooms`);
             if (roomsResponse.ok) {
               const roomsData = await roomsResponse.json();
-              if (active) {
-                setRooms(Array.isArray(roomsData.readingRooms) ? roomsData.readingRooms : []);
-              }
+              if (active) setRooms(Array.isArray(roomsData.readingRooms) ? roomsData.readingRooms : []);
             }
           } catch {
             // Room names fall back to a generic label below.
           }
         } catch (requestError) {
           if (!active) return;
-          const detail =
-            requestError instanceof Error ? requestError.message : 'Unknown error';
-          setError(
-            `Could not load your reservations. ${detail}. Please check that the backend server is running.`
-          );
+          const detail = requestError instanceof Error ? requestError.message : 'Unknown error';
+          setError(`Could not load your reservations. ${detail}. Please check that the backend server is running.`);
         } finally {
           if (active) setLoading(false);
         }
       };
-
       loadData();
-      return () => {
-        active = false;
-      };
+      return () => { active = false; };
     }, [])
   );
 
-  // Upcoming/active first, then history (cancelled) below.
   const activeReservations = reservations.filter((item) => item.status === 'active');
   const cancelledReservations = reservations.filter((item) => item.status !== 'active');
-
-  const roomFor = (reservation: Reservation) =>
-    rooms.find((room) => room._id === reservation.readingRoom);
+  const roomFor = (reservation: Reservation) => rooms.find((room) => room._id === reservation.readingRoom);
 
   const renderReservationCard = (reservation: Reservation) => {
     const room = roomFor(reservation);
-    const cancelled = reservation.status !== 'active';
+    const isActive = reservation.status === 'active';
     return (
       <Pressable
         key={reservation._id}
         accessibilityRole="button"
-        accessibilityLabel={`Reservation at ${
-          room?.name ?? 'reading room'
-        }, seat ${reservation.seatNumber}. View details.`}
-        style={styles.card}
+        accessibilityLabel={`Reservation at ${room?.name ?? 'reading room'}, seat ${reservation.seatNumber}. Tap to view details.`}
+        cssInterop={false}
+        style={({ pressed }) => [styles.reservationCard, pressed && styles.reservationCardPressed]}
         onPress={() =>
           router.push({
             pathname: '/reservations/[id]',
             params: { id: reservation._id },
           })
         }>
-        <View style={styles.cardHeader}>
-          <Text style={styles.roomName}>{room?.name ?? 'Reading room'}</Text>
-          <View style={[styles.statusBadge, cancelled && styles.statusBadgeMuted]}>
-            <Text
-              style={[styles.statusBadgeText, cancelled && styles.statusBadgeTextMuted]}>
-              {statusLabel(reservation.status)}
-            </Text>
+        {/* Left color bar */}
+        <View style={[styles.cardBar, isActive ? styles.cardBarActive : styles.cardBarCancelled]} />
+
+        <View style={styles.cardBody}>
+          {/* Header row */}
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.cardHeaderLeft}>
+              <Text style={styles.cardRoomName} numberOfLines={1}>
+                {room?.name ?? 'Reading Room'}
+              </Text>
+              {room && (
+                <Text style={styles.cardRoomMeta}>{room.building} {'\u00B7'} Floor {room.floor}</Text>
+              )}
+            </View>
+            <ReservationStatusBadge status={reservation.status} />
+          </View>
+
+          {/* Info rows */}
+          <View style={styles.cardInfoGrid}>
+            <View style={styles.cardInfoItem}>
+              <Text style={styles.cardInfoLabel}>Seat</Text>
+              <Text style={styles.cardInfoValue}>#{reservation.seatNumber}</Text>
+            </View>
+            <View style={styles.cardInfoItem}>
+              <Text style={styles.cardInfoLabel}>Date</Text>
+              <Text style={styles.cardInfoValue}>{formatIsoDate(reservation.date)}</Text>
+            </View>
+            <View style={[styles.cardInfoItem, styles.cardTimeItem]}>
+              <Text style={styles.cardInfoLabel}>Time</Text>
+              <Text style={styles.cardInfoValue}>{reservation.time}</Text>
+            </View>
+          </View>
+
+          {/* Ref + chevron */}
+          <View style={styles.cardFooterRow}>
+            <Text style={styles.cardRefCode}>{confirmationCodeFor(reservation._id)}</Text>
+            <Text style={styles.cardChevron}>{'\u203A'}</Text>
           </View>
         </View>
-        <Text style={styles.roomMeta}>
-          {room ? `${room.building} · Floor ${room.floor}` : 'Location unavailable'}
-        </Text>
-
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Date</Text>
-          <Text style={styles.detailValue}>{formatIsoDate(reservation.date)}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Time</Text>
-          <Text style={styles.detailValue}>{reservation.time}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Seat</Text>
-          <Text style={styles.detailValue}>Seat {reservation.seatNumber}</Text>
-        </View>
-        <View style={styles.detailRow}>
-          <Text style={styles.detailLabel}>Confirmation</Text>
-          <Text style={styles.detailCode}>
-            {confirmationCodeFor(reservation._id)}
-          </Text>
-        </View>
-
-        <Text style={styles.viewDetails}>View details ›</Text>
       </Pressable>
     );
   };
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
-      <Pressable onPress={() => router.push('/my-reservations')} accessibilityRole="button" accessibilityLabel="Back to My Reservations">
-        <Text style={{ color: '#2456b3', fontWeight: '600', marginBottom: 16 }}>Back to My Reservations</Text>
-      </Pressable>
-      <Text style={styles.breadcrumb}>STUDY SPACES</Text>
-      <Text style={styles.heading}>Seat Reservations</Text>
-      <Text style={styles.subheading}>Your seat reservations</Text>
+      {/* Page header */}
+      <View style={styles.pageHeader}>
+        <Text style={styles.breadcrumb}>STUDY SPACES</Text>
+        <Text style={styles.subheading}>Your reading-room seat bookings</Text>
+      </View>
 
+      {/* Loading */}
       {loading && (
-        <View style={styles.card}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.stateText}>Loading your reservations…</Text>
+        <View style={styles.stateCard}>
+          <ActivityIndicator size="large" color="#2456B3" />
+          <Text style={styles.stateText}>Loading your reservations...</Text>
         </View>
       )}
 
+      {/* Error */}
       {!loading && error !== '' && (
-        <View style={styles.card}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryButton} onPress={() => router.replace('/reservations')}>
-            <Text style={styles.retryButtonText}>TRY AGAIN</Text>
+        <View style={[styles.stateCard, styles.errorCard]}>
+          <Text style={styles.errorIcon}>{'\u26A0\uFE0F'}</Text>
+          <Text style={styles.errorTitle}>Could not load reservations</Text>
+          <Text style={styles.errorMessage}>Please check that the backend server is running and try again.</Text>
+          <Pressable
+            style={styles.retryButton}
+            onPress={() => router.replace('/reservations')}
+            accessibilityRole="button"
+            accessibilityLabel="Retry loading reservations">
+            <Text style={styles.retryButtonText}>Try Again</Text>
           </Pressable>
         </View>
       )}
 
-      {!loading && error === '' && activeReservations.length === 0 && (
-        <View style={styles.card}>
-          <Text style={styles.emptyTitle}>No active reservations</Text>
-          <Text style={styles.emptyText}>
-            Seats you reserve from a reading room will appear here.
-          </Text>
-        </View>
-      )}
-
-      {!loading && error === '' && activeReservations.map(renderReservationCard)}
-
-      {/* History — cancelled reservations (kept for reference, never deleted). */}
-      {!loading && error === '' && cancelledReservations.length > 0 && (
+      {/* Active reservations */}
+      {!loading && error === '' && (
         <>
-          <Text style={styles.historyHeading}>Cancelled</Text>
-          {cancelledReservations.map(renderReservationCard)}
+          {activeReservations.length === 0 ? (
+            <M2EmptyState
+              icon="📅"
+              title="No active reservations"
+              subtitle="Reserve a reading-room seat when you need a focused study space."
+              actionLabel="Browse Reading Rooms"
+              onAction={() => router.push('/reading-rooms')}
+            />
+          ) : (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Active</Text>
+                <View style={styles.sectionBadge}>
+                  <Text style={styles.sectionBadgeText}>{activeReservations.length}</Text>
+                </View>
+              </View>
+              {activeReservations.map(renderReservationCard)}
+            </>
+          )}
+
+          {/* Cancelled / history */}
+          {cancelledReservations.length > 0 && (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={[styles.sectionTitle, { color: '#66738A' }]}>Past</Text>
+                <View style={[styles.sectionBadge, { backgroundColor: '#EEF1F8' }]}>
+                  <Text style={[styles.sectionBadgeText, { color: '#66738A' }]}>
+                    {cancelledReservations.length}
+                  </Text>
+                </View>
+              </View>
+              {cancelledReservations.map(renderReservationCard)}
+            </>
+          )}
         </>
       )}
     </ScrollView>
@@ -242,35 +241,18 @@ export default function MyReservationsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#F6F7FB',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-    gap: 16,
-  },
-  breadcrumb: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1D4ED8',
-    letterSpacing: 1,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#12203F',
-  },
-  subheading: {
-    fontSize: 15,
-    color: '#4A5165',
-    marginTop: -8,
-  },
-  card: {
+  screen: { flex: 1, backgroundColor: '#F4F6FB' },
+  content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 48, gap: 16 },
+
+  pageHeader: { gap: 4 },
+  breadcrumb: { fontSize: 11, fontWeight: '700', color: '#2456B3', letterSpacing: 1.2, textTransform: 'uppercase' },
+  subheading: { fontSize: 14, color: '#66738A' },
+
+  stateCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 18,
+    padding: 28,
+    alignItems: 'center',
     gap: 10,
     shadowColor: '#12203F',
     shadowOpacity: 0.06,
@@ -278,111 +260,71 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  stateText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#4A5165',
-    textAlign: 'center',
+  stateText: { fontSize: 14, color: '#66738A', textAlign: 'center' },
+  errorCard: { borderLeftWidth: 3, borderLeftColor: '#B33535' },
+  errorIcon: { fontSize: 28 },
+  errorTitle: { fontSize: 16, fontWeight: '800', color: '#17243F' },
+  errorMessage: { fontSize: 13, color: '#66738A', textAlign: 'center', lineHeight: 18 },
+  retryButton: { marginTop: 4, backgroundColor: '#2456B3', borderRadius: 14, paddingVertical: 11, paddingHorizontal: 24 },
+  retryButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 0.4 },
+
+  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  sectionTitle: { fontSize: 16, fontWeight: '800', color: '#17243F' },
+  sectionBadge: {
+    backgroundColor: '#EAF0FC',
+    borderRadius: 10,
+    paddingHorizontal: 9,
+    paddingVertical: 3,
   },
-  errorText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '600',
-    color: '#B91C1C',
-    textAlign: 'center',
+  sectionBadgeText: { fontSize: 12, fontWeight: '800', color: '#2456B3' },
+
+  // Reservation card
+  reservationCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    flexDirection: 'row',
+    overflow: 'hidden',
+    shadowColor: '#12203F',
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  emptyTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#12203F',
-    textAlign: 'center',
-  },
-  emptyText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#7A8199',
-    textAlign: 'center',
-  },
-  retryButton: {
-    backgroundColor: '#1E3A8A',
-    borderRadius: 14,
-    paddingVertical: 13,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  historyHeading: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#12203F',
-    marginTop: 6,
-  },
-  cardHeader: {
+  reservationCardPressed: { opacity: 0.92 },
+  cardBar: { width: 4, borderRadius: 2 },
+  cardBarActive: { backgroundColor: '#2456B3' },
+  cardBarCancelled: { backgroundColor: '#D3D8E4' },
+
+  cardBody: { flex: 1, padding: 16, gap: 10 },
+
+  cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 10,
   },
-  roomName: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#12203F',
-    flexShrink: 1,
-  },
-  statusBadge: {
-    backgroundColor: '#E7F5EC',
+  cardHeaderLeft: { flex: 1, gap: 2 },
+  cardRoomName: { fontSize: 16, fontWeight: '800', color: '#17243F' },
+  cardRoomMeta: { fontSize: 12, color: '#66738A' },
+
+  cardInfoGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    backgroundColor: '#F4F6FB',
     borderRadius: 10,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    padding: 10,
   },
-  statusBadgeMuted: {
-    backgroundColor: '#FDECEC',
-  },
-  statusBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#15803D',
-    letterSpacing: 0.5,
-  },
-  statusBadgeTextMuted: {
-    color: '#B91C1C',
-  },
-  roomMeta: {
-    fontSize: 14,
-    color: '#4A5165',
-    marginTop: -6,
-  },
-  detailRow: {
+  cardInfoItem: { flex: 1, gap: 2 },
+  cardTimeItem: { flexBasis: '100%', flexGrow: 0, flexShrink: 0 },
+  cardInfoLabel: { fontSize: 10, fontWeight: '700', color: '#66738A', textTransform: 'uppercase', letterSpacing: 0.4 },
+  cardInfoValue: { fontSize: 13, fontWeight: '700', color: '#17243F' },
+
+  cardFooterRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E3E6EF',
+    alignItems: 'center',
   },
-  detailLabel: {
-    fontSize: 14,
-    color: '#7A8199',
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#12203F',
-  },
-  detailCode: {
-    fontSize: 14,
-    fontWeight: '800',
-    color: '#1E3A8A',
-    letterSpacing: 0.5,
-  },
-  viewDetails: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#1D4ED8',
-    textAlign: 'center',
-  },
+  cardRefCode: { fontSize: 12, fontWeight: '800', color: '#2456B3', letterSpacing: 0.5 },
+  cardChevron: { fontSize: 20, fontWeight: '700', color: '#66738A', lineHeight: 22 },
 });

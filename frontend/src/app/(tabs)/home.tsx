@@ -1,9 +1,9 @@
-import { router, useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, usePathname } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { SymbolView } from 'expo-symbols';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Platform,
   Pressable,
   RefreshControl,
@@ -20,7 +20,6 @@ import { Brand, greetingForHour } from '@/constants/brand';
 import { API_ORIGIN, Reservation, reservationsApi } from '@/lib/api';
 import {
   PortalSession,
-  clearPortalSession,
   getPortalSession,
   portalBackendId,
 } from '@/lib/portal-session';
@@ -118,6 +117,7 @@ function deriveLibraryStatus(rooms: RoomInfo[]): LibraryStatus {
 }
 
 export default function StudentHomeScreen() {
+  const pathname = usePathname();
   const [session, setSession] = useState<PortalSession | null>(null);
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<LibraryStatus>({ kind: 'neutral', label: 'Library Services' });
@@ -125,7 +125,6 @@ export default function StudentHomeScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState('');
-  const [profileOpen, setProfileOpen] = useState(false);
 
   const loadHome = useCallback(async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -224,16 +223,11 @@ export default function StudentHomeScreen() {
     router.push({ pathname: '/books', params: query ? { q: query } : {} });
   };
 
-  const handleSignOut = () => {
-    setProfileOpen(false);
-    void clearPortalSession().then(() => router.replace('/portal'));
-  };
-
   const displayName = session?.displayName?.trim() || 'Student';
-  const isAcademic = session?.role === 'academic_staff';
 
   return (
     <View style={styles.screen}>
+      {pathname === '/home' && <StatusBar style="dark" />}
       <SafeAreaView style={styles.safeArea} edges={['top']}>
         {/* Header */}
         <View style={styles.header}>
@@ -247,6 +241,7 @@ export default function StudentHomeScreen() {
               accessibilityLabel="Notifications"
               hitSlop={6}
               onPress={() => router.push('/notifications')}
+              cssInterop={false}
               style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
               <SymbolView
                 name={{ ios: 'bell', android: 'notifications', web: 'notifications' }}
@@ -258,7 +253,8 @@ export default function StudentHomeScreen() {
               accessibilityRole="button"
               accessibilityLabel="Profile"
               hitSlop={6}
-              onPress={() => setProfileOpen(true)}
+              onPress={() => router.push('/profile')}
+              cssInterop={false}
               style={({ pressed }) => [styles.headerIcon, pressed && styles.pressed]}>
               <SymbolView
                 name={{ ios: 'person.crop.circle', android: 'account_circle', web: 'account_circle' }}
@@ -402,31 +398,6 @@ export default function StudentHomeScreen() {
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
         </ScrollView>
 
-        {/* Profile placeholder modal (small, non-destructive) */}
-        <Modal animationType="fade" transparent visible={profileOpen} onRequestClose={() => setProfileOpen(false)}>
-          <View style={styles.modalBackdrop}>
-            <View style={styles.modalCard}>
-              <LibConnectMark size={52} />
-              <Text style={styles.modalName}>{displayName}</Text>
-              <Text style={styles.modalRole}>
-                {isAcademic ? 'Academic Staff' : 'Student'} · Library ID{' '}
-                <Text style={styles.modalRoleStrong}>{portalBackendId()}</Text>
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                onPress={handleSignOut}
-                style={({ pressed }) => [styles.modalSignOut, pressed && styles.pressed]}>
-                <Text style={styles.modalSignOutText}>Sign out</Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setProfileOpen(false)}
-                style={({ pressed }) => [styles.modalClose, pressed && styles.pressed]}>
-                <Text style={styles.modalCloseText}>Close</Text>
-              </Pressable>
-            </View>
-          </View>
-        </Modal>
       </SafeAreaView>
     </View>
   );
@@ -522,7 +493,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   headerLeft: {
     flexDirection: 'row',
@@ -539,9 +510,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   headerIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: Brand.white,
     borderWidth: 1,
     borderColor: Brand.line,
@@ -771,61 +742,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     marginTop: 12,
     textAlign: 'center',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(16,43,105,0.35)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 24,
-  },
-  modalCard: {
-    backgroundColor: Brand.white,
-    borderRadius: 18,
-    padding: 24,
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 360,
-  },
-  modalName: {
-    color: Brand.ink,
-    fontSize: 19,
-    fontWeight: '800',
-    marginTop: 12,
-  },
-  modalRole: {
-    color: Brand.muted,
-    fontSize: 13,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  modalRoleStrong: {
-    fontWeight: '700',
-    color: Brand.ink,
-  },
-  modalSignOut: {
-    backgroundColor: Brand.canvas,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Brand.line,
-    paddingHorizontal: 22,
-    paddingVertical: 11,
-    marginTop: 18,
-  },
-  modalSignOutText: {
-    color: Brand.navy,
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  modalClose: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    marginTop: 6,
-  },
-  modalCloseText: {
-    color: Brand.muted,
-    fontSize: 13,
-    fontWeight: '600',
   },
   pressed: {
     opacity: 0.75,

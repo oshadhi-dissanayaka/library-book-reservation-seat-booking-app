@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { Image, useColorScheme } from 'react-native';
 
 import { NotificationButton } from '@/components/notification-button';
+import M2Header from '@/components/m2/M2Header';
 import { RoleGatewayButton } from '@/components/role-gateway-button';
 import { Colors } from '@/constants/theme';
 
@@ -28,6 +29,7 @@ export default function AppTabs() {
         name="home"
         options={{
           title: 'Home',
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Image
               source={require('@/assets/images/tabIcons/home.png')}
@@ -55,6 +57,7 @@ export default function AppTabs() {
         name="reading-rooms"
         options={{
           title: 'Seats',
+          header: () => <M2Header />,
           tabBarIcon: ({ color, size }) => (
             <SymbolView
               name={{ ios: 'chair.lounge', android: 'event_seat', web: 'event_seat' }}
@@ -84,6 +87,7 @@ export default function AppTabs() {
         name="notifications"
         options={{
           title: 'Notifications',
+          header: () => <M2Header />,
           href: null,
           tabBarIcon: ({ color, size }) => (
             <SymbolView name={{ ios: 'bell', android: 'notifications', web: 'notifications' }} tintColor={color} size={size} />
@@ -91,7 +95,8 @@ export default function AppTabs() {
         }}
       />
       <Tabs.Screen name="explore" options={{ href: null, title: 'Book Reservations' }} />
-      <Tabs.Screen name="reservations" options={{ href: null, title: 'Seat Reservations' }} />
+      <Tabs.Screen name="profile" options={{ href: null, title: 'My Profile', header: () => <M2Header /> }} />
+      <Tabs.Screen name="reservations" options={{ href: null, title: 'Seat Reservations', header: () => <M2Header /> }} />
     </Tabs>
   );
 }
