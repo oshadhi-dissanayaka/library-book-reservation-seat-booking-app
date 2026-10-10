@@ -9,8 +9,11 @@ const {
   rejectReservation,
   getBooks,
   updateBookAvailability,
+  createBook,
   getOccupancy,
   updateSeatStatus,
+  createReadingRoom,
+  addSeatsToRoom,
   getNoShowsAndCancellations,
   markReservationNoShow,
 } = require("../controllers/staffController");
@@ -35,10 +38,13 @@ router.patch("/reservations/:id/reject", rejectReservation);
 
 // WF-21: Book Availability Management
 router.get("/books", getBooks);
+router.post("/books", createBook);
 router.patch("/books/:id/availability", updateBookAvailability);
 
-// WF-22: Reading Room Occupancy
+// WF-22: Reading Room Occupancy & Management
 router.get("/occupancy", getOccupancy);
+router.post("/reading-rooms", createReadingRoom);
+router.post("/reading-rooms/:id/seats", addSeatsToRoom);
 router.patch("/occupancy/seat/:id", updateSeatStatus);
 
 // WF-23: No-show & Cancellation Management
