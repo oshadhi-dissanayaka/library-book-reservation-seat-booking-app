@@ -13,6 +13,7 @@ import { ConfirmationModal } from '../components/ConfirmationModal';
 import { StaffHeader } from '../components/StaffHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { NoShowsSummaryData, Reservation } from '../types/staff.types';
 
 interface NoShowCancellationScreenProps {
@@ -31,15 +32,19 @@ export const NoShowCancellationScreen: React.FC<NoShowCancellationScreenProps> =
   const [modalAction, setModalAction] = useState<'release' | 'resolve' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [feedback, setFeedback] = useState('');
+  const [error, setError] = useState('');
 
   const fetchNoShows = async () => {
     try {
       const res = await staffApi.getNoShows();
       if (res.success) {
         setSummaryData(res.data);
+        setError('');
+      } else {
+        setError(res.message || 'Failed to load no-shows and cancellations.');
       }
     } catch {
-      // Handled
+      setError('Failed to load no-shows and cancellations.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -70,9 +75,11 @@ export const NoShowCancellationScreen: React.FC<NoShowCancellationScreenProps> =
         setSelectedRecord(null);
         setModalAction(null);
         fetchNoShows();
+      } else {
+        setError(res.message || 'Failed to release this reservation.');
       }
     } catch {
-      // Handled
+      setError('Failed to release this reservation.');
     } finally {
       setActionLoading(false);
     }
@@ -96,9 +103,15 @@ export const NoShowCancellationScreen: React.FC<NoShowCancellationScreenProps> =
         </View>
       ) : null}
 
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={staffTheme.navy} />
           <Text style={styles.loadingText}>Fetching no-shows and cancellations...</Text>
         </View>
       ) : (
@@ -116,7 +129,7 @@ export const NoShowCancellationScreen: React.FC<NoShowCancellationScreenProps> =
                 <View style={styles.summaryTop}>
                   <View style={styles.counterBox}>
                     <Text style={styles.counterNum}>
-                      {summaryData?.summary.todayNoShows || 3}
+                      {summaryData?.summary.todayNoShows ?? 0}
                     </Text>
                     <Text style={styles.counterLabel}>Today&apos;s No-shows</Text>
                   </View>
@@ -206,17 +219,28 @@ export const NoShowCancellationScreen: React.FC<NoShowCancellationScreenProps> =
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
   },
   feedbackBanner: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: staffTheme.paleGreen,
     padding: 12,
     borderBottomWidth: 1,
-    borderColor: '#86EFAC',
+    borderColor: staffTheme.greenLine,
     alignItems: 'center',
   },
   feedbackText: {
-    color: '#15803D',
+    color: staffTheme.green,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  errorBanner: {
+    backgroundColor: staffTheme.paleRed,
+    padding: 12,
+    borderBottomWidth: 1,
+    borderColor: staffTheme.redLine,
+  },
+  errorText: {
+    color: staffTheme.red,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -227,7 +251,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
   },
   listContent: {
@@ -235,12 +259,12 @@ const styles = StyleSheet.create({
     paddingBottom: 36,
   },
   summaryCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 18,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -259,46 +283,46 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   counterNum: {
-    color: '#DC2626',
+    color: staffTheme.red,
     fontSize: 32,
     fontWeight: '900',
   },
   counterLabel: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 16,
     fontWeight: '700',
   },
   thresholdBadge: {
-    backgroundColor: '#FEF3C7',
+    backgroundColor: staffTheme.paleAmber,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
   },
   thresholdText: {
-    color: '#B45309',
+    color: staffTheme.amber,
     fontSize: 10,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   syncNote: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
     lineHeight: 16,
   },
   sectionHeader: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
     marginBottom: 10,
   },
   recordCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -317,33 +341,33 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   recordId: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '800',
   },
   typeText: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
   },
   recordTitle: {
-    color: '#1E293B',
+    color: staffTheme.ink,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 2,
   },
   studentMeta: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
     marginBottom: 8,
   },
   reasonBox: {
-    backgroundColor: '#FEF2F2',
+    backgroundColor: staffTheme.paleRed,
     padding: 10,
     borderRadius: 8,
     marginBottom: 12,
   },
   reasonText: {
-    color: '#B91C1C',
+    color: staffTheme.red,
     fontSize: 12,
     fontWeight: '600',
   },
@@ -351,17 +375,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: staffTheme.canvas,
     paddingTop: 10,
   },
   releaseBtn: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 8,
   },
   releaseBtnText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -377,12 +401,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#0F172A',
+    color: staffTheme.ink,
     marginBottom: 4,
   },
   emptySub: {
     fontSize: 13,
-    color: '#64748B',
+    color: staffTheme.muted,
     textAlign: 'center',
   },
 });

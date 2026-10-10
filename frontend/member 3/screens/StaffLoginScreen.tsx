@@ -1,3 +1,4 @@
+import { SymbolView } from 'expo-symbols';
 import React, { useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +14,7 @@ import {
 } from 'react-native';
 
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { StaffUser } from '../types/staff.types';
 
 interface StaffLoginScreenProps {
@@ -25,7 +27,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
   onBackToPortal,
 }) => {
   const [username, setUsername] = useState('STF-4092');
-  const [password, setPassword] = useState('••••••••');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -43,7 +45,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
       if (result.success) {
         onLoginSuccess(result.data);
       } else {
-        setError('Authentication failed. Please verify credentials.');
+        setError(result.message || 'Authentication failed. Please verify credentials.');
       }
     } catch {
       setError('Unable to reach server. Please check your network.');
@@ -69,7 +71,15 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
 
           <View style={styles.headerBox}>
             <View style={styles.logoBadge}>
-              <Text style={styles.logoIcon}>🏛️</Text>
+              <SymbolView
+                name={{
+                  ios: 'building.columns',
+                  android: 'account_balance',
+                  web: 'account_balance',
+                }}
+                tintColor={staffTheme.white}
+                size={30}
+              />
             </View>
             <Text style={styles.portalTag}>INSTITUTIONAL ACCESS</Text>
             <Text style={styles.title}>Library Portal Login</Text>
@@ -95,7 +105,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
                   setError('');
                 }}
                 placeholder="Enter Staff ID (e.g. STF-4092)"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={staffTheme.placeholder}
                 autoCapitalize="characters"
               />
             </View>
@@ -110,7 +120,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
                   setError('');
                 }}
                 placeholder="Enter Password"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={staffTheme.placeholder}
                 secureTextEntry
               />
             </View>
@@ -121,7 +131,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
               disabled={loading}
               activeOpacity={0.8}>
               {loading ? (
-                <ActivityIndicator color="#FFFFFF" />
+                <ActivityIndicator color={staffTheme.white} />
               ) : (
                 <Text style={styles.loginButtonText}>Sign In to Circulation Terminal →</Text>
               )}
@@ -144,7 +154,7 @@ export const StaffLoginScreen: React.FC<StaffLoginScreenProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: staffTheme.canvas,
   },
   container: {
     flex: 1,
@@ -159,14 +169,14 @@ const styles = StyleSheet.create({
   },
   backBtn: {
     alignSelf: 'flex-start',
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.paleBlue,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
     marginBottom: 20,
   },
   backBtnText: {
-    color: '#94A3B8',
+    color: staffTheme.navy,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -178,38 +188,35 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#334155',
-  },
-  logoIcon: {
-    fontSize: 32,
+    borderColor: staffTheme.navyLine,
   },
   portalTag: {
-    color: '#38BDF8',
+    color: staffTheme.blue,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 1.2,
     marginBottom: 4,
   },
   title: {
-    color: '#FFFFFF',
+    color: staffTheme.ink,
     fontSize: 26,
     fontWeight: '800',
     textAlign: 'center',
   },
   subtitle: {
-    color: '#94A3B8',
+    color: staffTheme.muted,
     fontSize: 13,
     textAlign: 'center',
     marginTop: 4,
   },
   card: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
+    backgroundColor: staffTheme.white,
+    borderRadius: 14,
     padding: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 10 },
@@ -218,13 +225,13 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   errorBox: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: staffTheme.paleRed,
     padding: 10,
     borderRadius: 8,
     marginBottom: 16,
   },
   errorText: {
-    color: '#B91C1C',
+    color: staffTheme.red,
     fontSize: 13,
     fontWeight: '600',
   },
@@ -232,23 +239,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   label: {
-    color: '#334155',
+    color: staffTheme.ink,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 6,
   },
   input: {
-    borderWidth: 1.5,
-    borderColor: '#E2E8F0',
-    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: staffTheme.line,
+    borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 12,
-    fontSize: 15,
-    color: '#0F172A',
-    backgroundColor: '#F8FAFC',
+    fontSize: 14,
+    color: staffTheme.ink,
+    backgroundColor: staffTheme.white,
   },
   loginButton: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -256,32 +263,32 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   loginButtonText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
   hintBox: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
     borderRadius: 12,
     padding: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
   },
   hintTitle: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 2,
   },
   hintCode: {
-    color: '#2563EB',
+    color: staffTheme.navy,
     fontSize: 12,
     fontWeight: '700',
     marginBottom: 4,
   },
   hintSub: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 11,
     lineHeight: 16,
   },

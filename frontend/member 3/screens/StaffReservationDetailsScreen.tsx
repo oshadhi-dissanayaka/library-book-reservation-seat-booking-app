@@ -14,6 +14,7 @@ import { ConfirmationModal } from '../components/ConfirmationModal';
 import { StaffHeader } from '../components/StaffHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { Reservation, ReservationStatus } from '../types/staff.types';
 
 interface StaffReservationDetailsScreenProps {
@@ -55,6 +56,8 @@ export const StaffReservationDetailsScreen: React.FC<
         if (onStatusUpdated) onStatusUpdated(res.data);
         setFeedbackMessage(`Status updated to ${newStatus}`);
         setTimeout(() => setFeedbackMessage(''), 3500);
+      } else {
+        Alert.alert('Update failed', res.message || 'Failed to update reservation status.');
       }
     } catch {
       Alert.alert('Error', 'Failed to update reservation status.');
@@ -73,6 +76,8 @@ export const StaffReservationDetailsScreen: React.FC<
         if (onStatusUpdated) onStatusUpdated(res.data);
         setFeedbackMessage(`Reservation marked as NO-SHOW. Resource released.`);
         setTimeout(() => setFeedbackMessage(''), 4000);
+      } else {
+        Alert.alert('No-show failed', res.message || 'Failed to record no-show.');
       }
     } catch {
       Alert.alert('Error', 'Failed to record no-show.');
@@ -152,7 +157,7 @@ export const StaffReservationDetailsScreen: React.FC<
               <Text style={styles.studentName}>{reservation.studentName}</Text>
               <Text style={styles.studentId}>Student ID: {reservation.studentId}</Text>
               <Text style={styles.studentProg}>
-                {reservation.studentProgram || 'Faculty of Computing'}
+                {reservation.studentProgram || '—'}
               </Text>
             </View>
           </View>
@@ -168,7 +173,7 @@ export const StaffReservationDetailsScreen: React.FC<
             </View>
             <View style={styles.gridCol}>
               <Text style={styles.gridLabel}>Pickup Date</Text>
-              <Text style={styles.gridValue}>{reservation.pickupDate || '16 September 2026'}</Text>
+              <Text style={styles.gridValue}>{reservation.pickupDate || '—'}</Text>
             </View>
           </View>
 
@@ -176,13 +181,13 @@ export const StaffReservationDetailsScreen: React.FC<
             <View style={styles.gridCol}>
               <Text style={styles.gridLabel}>Location</Text>
               <Text style={styles.gridValue}>
-                {reservation.pickupLocation || 'Circulation Desk 01'}
+                {reservation.pickupLocation || '—'}
               </Text>
             </View>
             <View style={styles.gridCol}>
               <Text style={styles.gridLabel}>Duration / Slot</Text>
               <Text style={styles.gridValue}>
-                {isBook ? reservation.loanDuration || '14 Days' : reservation.timeSlot || '10:00 - 12:00'}
+                {isBook ? reservation.loanDuration || '—' : reservation.timeSlot || '—'}
               </Text>
             </View>
           </View>
@@ -211,7 +216,7 @@ export const StaffReservationDetailsScreen: React.FC<
             disabled={loading}
             activeOpacity={0.8}>
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={staffTheme.white} />
             ) : (
               <Text style={styles.updateStatusText}>UPDATE STATUS</Text>
             )}
@@ -247,10 +252,10 @@ export const StaffReservationDetailsScreen: React.FC<
             <Text style={styles.sheetSub}>Update circulation queue for {reservation.reservationId}</Text>
 
             {[
-              { status: 'READY_FOR_PICKUP', label: 'Ready for Pickup (At Circulation Desk)', color: '#2563EB' },
-              { status: 'CONFIRMED', label: 'Confirmed (Standard Hold)', color: '#16A34A' },
-              { status: 'COMPLETED', label: 'Completed (Book Issued / Seat Checked In)', color: '#0F172A' },
-              { status: 'EXCEPTION', label: 'Exception (Hold for Review)', color: '#DC2626' },
+              { status: 'READY_FOR_PICKUP', label: 'Ready for Pickup (At Circulation Desk)', color: staffTheme.navy },
+              { status: 'CONFIRMED', label: 'Confirmed (Standard Hold)', color: staffTheme.green },
+              { status: 'COMPLETED', label: 'Completed (Book Issued / Seat Checked In)', color: staffTheme.muted },
+              { status: 'EXCEPTION', label: 'Exception (Hold for Review)', color: staffTheme.red },
             ].map((opt) => (
               <TouchableOpacity
                 key={opt.status}
@@ -288,17 +293,17 @@ export const StaffReservationDetailsScreen: React.FC<
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
   },
   feedbackBanner: {
-    backgroundColor: '#DCFCE7',
+    backgroundColor: staffTheme.paleGreen,
     padding: 12,
     borderBottomWidth: 1,
-    borderColor: '#86EFAC',
+    borderColor: staffTheme.greenLine,
     alignItems: 'center',
   },
   feedbackText: {
-    color: '#15803D',
+    color: staffTheme.green,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -307,12 +312,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 18,
     marginBottom: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
@@ -326,24 +331,24 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   idBadge: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
   },
   idBadgeText: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '800',
   },
   mainTitle: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 20,
     fontWeight: '800',
     marginBottom: 4,
   },
   subtitle: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 13,
     marginBottom: 12,
   },
@@ -353,23 +358,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   detailLabel: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 13,
     fontWeight: '600',
     width: 110,
   },
   detailValue: {
-    color: '#1E293B',
+    color: staffTheme.ink,
     fontSize: 13,
     fontWeight: '600',
     flex: 1,
   },
   shelfHighlight: {
-    color: '#2563EB',
+    color: staffTheme.navy,
     fontWeight: '700',
   },
   sectionHeader: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -383,13 +388,13 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: staffTheme.paleBlue,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   avatarText: {
-    color: '#1D4ED8',
+    color: staffTheme.blue,
     fontSize: 18,
     fontWeight: '800',
   },
@@ -397,17 +402,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   studentName: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 15,
     fontWeight: '700',
   },
   studentId: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 13,
     marginTop: 2,
   },
   studentProg: {
-    color: '#94A3B8',
+    color: staffTheme.muted,
     fontSize: 11,
     marginTop: 2,
   },
@@ -419,37 +424,37 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   gridLabel: {
-    color: '#94A3B8',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '600',
     marginBottom: 2,
   },
   gridValue: {
-    color: '#1E293B',
+    color: staffTheme.ink,
     fontSize: 13,
     fontWeight: '700',
   },
   deskNoteBox: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
     borderRadius: 8,
     padding: 10,
     marginTop: 4,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
   },
   deskNoteLabel: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '700',
     marginBottom: 2,
   },
   deskNoteText: {
-    color: '#334155',
+    color: staffTheme.ink,
     fontSize: 12,
   },
   policyCard: {
     flexDirection: 'row',
-    backgroundColor: '#FEF3C7',
+    backgroundColor: staffTheme.paleAmber,
     borderRadius: 12,
     padding: 12,
     marginBottom: 20,
@@ -460,7 +465,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
   },
   policyText: {
-    color: '#92400E',
+    color: staffTheme.amberDeep,
     fontSize: 12,
     lineHeight: 16,
     flex: 1,
@@ -470,18 +475,18 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   updateStatusButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: staffTheme.navy,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
-    shadowColor: '#2563EB',
+    shadowColor: staffTheme.navy,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   updateStatusText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -492,29 +497,29 @@ const styles = StyleSheet.create({
   },
   rejectButton: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#DC2626',
+    borderColor: staffTheme.red,
   },
   rejectButtonText: {
-    color: '#DC2626',
+    color: staffTheme.red,
     fontSize: 13,
     fontWeight: '700',
   },
   noShowButton: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1.5,
-    borderColor: '#D97706',
+    borderColor: staffTheme.amber,
   },
   noShowButtonText: {
-    color: '#D97706',
+    color: staffTheme.amber,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -524,19 +529,19 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   statusSheet: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
     paddingBottom: 36,
   },
   sheetTitle: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 18,
     fontWeight: '800',
   },
   sheetSub: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
     marginTop: 2,
     marginBottom: 20,
@@ -546,7 +551,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: '#F1F5F9',
+    borderBottomColor: staffTheme.canvas,
     gap: 12,
   },
   statusOptionDot: {
@@ -555,7 +560,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
   },
   sheetOptionText: {
-    color: '#1E293B',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
@@ -566,7 +571,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   sheetCancelText: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
     fontWeight: '700',
   },

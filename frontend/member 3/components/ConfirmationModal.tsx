@@ -8,6 +8,8 @@ import {
   View,
 } from 'react-native';
 
+import { staffTheme } from '../theme/staffTheme';
+
 interface ConfirmationModalProps {
   visible: boolean;
   title: string;
@@ -64,7 +66,7 @@ export const ConfirmationModal: React.FC<ConfirmationModalProps> = ({
               disabled={isLoading}
               activeOpacity={0.7}>
               {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
+                <ActivityIndicator color={staffTheme.white} size="small" />
               ) : (
                 <Text style={styles.confirmText}>{confirmLabel}</Text>
               )}
@@ -87,7 +89,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 400,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 20,
     padding: 24,
     alignItems: 'center',
@@ -106,23 +108,23 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   iconDestructive: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: staffTheme.paleRed,
   },
   iconInfo: {
-    backgroundColor: '#DBEAFE',
+    backgroundColor: staffTheme.paleBlue,
   },
   iconText: {
     fontSize: 26,
   },
   title: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 18,
     fontWeight: '800',
     textAlign: 'center',
     marginBottom: 8,
   },
   message: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
@@ -141,21 +143,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   cancelButton: {
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
   },
   cancelText: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 14,
     fontWeight: '700',
   },
   confirmPrimaryButton: {
-    backgroundColor: '#2563EB',
+    backgroundColor: staffTheme.navy,
   },
   confirmDestructiveButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: staffTheme.red,
   },
   confirmText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 14,
     fontWeight: '700',
   },

@@ -7,11 +7,66 @@ import {
   StaffUser,
 } from '../types/staff.types';
 
-// Standard API Base URL with Expo / Mobile LAN support
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL || 'http://localhost:5001/api/staff';
+import { API_BASE } from '@/lib/api';
 
-// Default fallback dataset for offline/prototype demonstration
+// Standard API Base URL with Expo / Mobile LAN support.
+// Derived from the shared API config in src/lib/api.ts
+// (EXPO_PUBLIC_API_URL override, else Expo dev-server host, port 5000),
+// plus the backend's /api/staff mount point.
+const API_BASE_URL = `${API_BASE}/staff`;
+
+/**
+ * Demo mode is EXPLICIT and opt-in.
+ *
+ * - Default (false): every failed read/write returns { success: false, message }
+ *   and NO local object is mutated — screens surface the error.
+ * - EXPO_PUBLIC_DEMO_MODE=true (frontend/.env): the hardcoded datasets below
+ *   are served instead, clearly a prototype demonstration, never persistence.
+ */
+const DEMO_MODE = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
+
+type RequestResult<T> = {
+  ok: boolean;
+  status: number;
+  body: T | null;
+  message: string;
+};
+
+/** Fetch JSON without ever throwing; failures come back as ok:false. */
+async function request<T>(path: string, init?: RequestInit): Promise<RequestResult<T>> {
+  try {
+    const res = await fetch(`${API_BASE_URL}${path}`, init);
+    const body = (await res.json().catch(() => null)) as T | null;
+    if (!res.ok) {
+      const message =
+        (body as { message?: string } | null)?.message ||
+        `Request failed (${res.status})`;
+      return { ok: false, status: res.status, body, message };
+    }
+    return { ok: true, status: res.status, body, message: '' };
+  } catch {
+    return {
+      ok: false,
+      status: 0,
+      body: null,
+      message: 'Cannot reach the staff server. Check that the backend is running.',
+    };
+  }
+}
+
+function demoCopy<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/** Login succeeds with a staff user, or fails with a message only. */
+type LoginResponse =
+  | { success: true; message?: string; data: StaffUser }
+  | { success: false; message?: string; data?: undefined };
+
+// ---------------------------------------------------------------------------
+// Demo-mode datasets — served ONLY when EXPO_PUBLIC_DEMO_MODE=true.
+// ---------------------------------------------------------------------------
+
 const FALLBACK_DASHBOARD: StaffDashboardData = {
   staff: {
     staffId: 'STF-4092',
@@ -256,58 +311,92 @@ const FALLBACK_BOOKS: Book[] = [
   },
 ];
 
+const FALLBACK_OCCUPANCY_ROOMS: ReadingRoomInfo[] = [
+  {
+    name: 'Reading Room A',
+    floor: 'Floor 02',
+    wing: 'West Wing',
+    totalSeats: 30,
+    occupiedSeats: 18,
+    availableSeats: 12,
+    occupancyRate: 60,
+    seats: [],
+  },
+  {
+    name: 'Reading Room B',
+    floor: 'Floor 02',
+    wing: 'East Wing',
+    totalSeats: 20,
+    occupiedSeats: 0,
+    availableSeats: 20,
+    occupancyRate: 0,
+    seats: [],
+  },
+];
+
 export const staffApi = {
   /**
-   * Staff Authentication
+   * Staff Authentication (WF-16)
    */
-  async login(username = 'STF-4092', password = ''): Promise<{ success: boolean; data: StaffUser }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-      });
-      if (res.ok) {
-        return await res.json();
+  async login(username: string, password: string): Promise<LoginResponse> {
+    const result = await request<LoginResponse>('/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (result.ok && result.body?.success) {
+      return result.body;
+    }
+
+    if (DEMO_MODE) {
+      // Explicit demo credential check — mirrors the backend rule so demo
+      // mode still rejects wrong credentials.
+      if (username.trim().toUpperCase() !== 'STF-4092' || password !== 'staff-demo') {
+        return { success: false, message: 'Invalid Staff ID or password.' };
       }
-    } catch {
-      // Offline fallback
+      return {
+        success: true,
+        data: {
+          staffId: 'STF-4092',
+          name: 'Circulation Desk Officer',
+          role: 'Library Staff',
+          desk: 'Circulation Desk 01',
+          shift: '08:00 - 17:00',
+          token: 'local-staff-token',
+        },
+      };
     }
 
     return {
-      success: true,
-      data: {
-        staffId: username || 'STF-4092',
-        name: 'Circulation Desk Officer',
-        role: 'Library Staff',
-        desk: 'Circulation Desk 01',
-        shift: '08:00 - 17:00',
-        token: 'local-staff-token',
-      },
+      success: false,
+      message: result.message || 'Authentication failed.',
     };
   },
 
   /**
-   * Staff Operational Dashboard Overview
+   * Staff Operational Dashboard Overview (WF-17)
    */
-  async getDashboard(): Promise<{ success: boolean; data: StaffDashboardData }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/dashboard`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Offline fallback
+  async getDashboard(): Promise<{
+    success: boolean;
+    message?: string;
+    data: StaffDashboardData;
+  }> {
+    const result = await request<{ success: boolean; data: StaffDashboardData }>(
+      '/dashboard'
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    return {
-      success: true,
-      data: FALLBACK_DASHBOARD,
-    };
+    if (DEMO_MODE) {
+      return { success: true, data: demoCopy(FALLBACK_DASHBOARD) };
+    }
+    return { success: false, message: result.message, data: FALLBACK_DASHBOARD };
   },
 
   /**
-   * Reservation Management & Filter Queue
+   * Reservation Management & Filter Queue (WF-18)
    */
   async getReservations(
     filter: 'all' | 'today' | 'exceptions' = 'all',
@@ -315,6 +404,7 @@ export const staffApi = {
     type: 'all' | 'Book' | 'Seat' = 'all'
   ): Promise<{
     success: boolean;
+    message?: string;
     counts: {
       all: number;
       actualAll: number;
@@ -325,364 +415,362 @@ export const staffApi = {
     };
     data: Reservation[];
   }> {
-    try {
-      const params = new URLSearchParams();
-      if (filter) params.append('filter', filter);
-      if (search) params.append('search', search);
-      if (type) params.append('type', type);
+    const params = new URLSearchParams();
+    if (filter) params.append('filter', filter);
+    if (search) params.append('search', search);
+    if (type) params.append('type', type);
 
-      const res = await fetch(`${API_BASE_URL}/reservations?${params.toString()}`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Offline fallback
-    }
-
-    let filtered = [...FALLBACK_RESERVATIONS];
-    if (filter === 'exceptions') {
-      filtered = filtered.filter((r) => r.requiresAttention || r.status === 'EXCEPTION');
-    } else if (filter === 'today') {
-      filtered = filtered.filter(
-        (r) => r.status === 'CONFIRMED' || r.status === 'READY_FOR_PICKUP'
-      );
-    }
-    if (type !== 'all') {
-      filtered = filtered.filter((r) => r.type === type);
-    }
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.reservationId.toLowerCase().includes(q) ||
-          r.studentName.toLowerCase().includes(q) ||
-          (r.bookTitle && r.bookTitle.toLowerCase().includes(q)) ||
-          (r.seatNumber && r.seatNumber.toLowerCase().includes(q))
-      );
-    }
-
-    return {
-      success: true,
+    const result = await request<{
+      success: boolean;
+      message?: string;
       counts: {
-        all: 32,
-        actualAll: FALLBACK_RESERVATIONS.length,
-        today: 14,
-        actualToday: 3,
-        exceptions: 3,
-        actualExceptions: 2,
-      },
-      data: filtered,
-    };
-  },
+        all: number;
+        actualAll: number;
+        today: number;
+        actualToday: number;
+        exceptions: number;
+        actualExceptions: number;
+      };
+      data: Reservation[];
+    }>(`/reservations?${params.toString()}`);
 
-  /**
-   * Reservation Details by Identifier
-   */
-  async getReservationById(id: string): Promise<{ success: boolean; data: Reservation }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/reservations/${id}`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Offline fallback
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    const found = FALLBACK_RESERVATIONS.find(
-      (r) => r.reservationId === id || r._id === id
-    ) || FALLBACK_RESERVATIONS[0];
+    if (DEMO_MODE) {
+      let filtered = demoCopy(FALLBACK_RESERVATIONS);
+      if (filter === 'exceptions') {
+        filtered = filtered.filter((r) => r.requiresAttention || r.status === 'EXCEPTION');
+      } else if (filter === 'today') {
+        filtered = filtered.filter(
+          (r) => r.status === 'CONFIRMED' || r.status === 'READY_FOR_PICKUP'
+        );
+      }
+      if (type !== 'all') {
+        filtered = filtered.filter((r) => r.type === type);
+      }
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        filtered = filtered.filter(
+          (r) =>
+            r.reservationId.toLowerCase().includes(q) ||
+            r.studentName.toLowerCase().includes(q) ||
+            (r.bookTitle && r.bookTitle.toLowerCase().includes(q)) ||
+            (r.seatNumber && r.seatNumber.toLowerCase().includes(q))
+        );
+      }
+
+      return {
+        success: true,
+        counts: {
+          all: FALLBACK_RESERVATIONS.length,
+          actualAll: FALLBACK_RESERVATIONS.length,
+          today: 3,
+          actualToday: 3,
+          exceptions: 2,
+          actualExceptions: 2,
+        },
+        data: filtered,
+      };
+    }
 
     return {
-      success: true,
-      data: found,
+      success: false,
+      message: result.message,
+      counts: { all: 0, actualAll: 0, today: 0, actualToday: 0, exceptions: 0, actualExceptions: 0 },
+      data: [],
     };
   },
 
   /**
-   * Update Reservation Status & Circulation Desk Notes
+   * Reservation Details by Identifier (WF-19)
+   */
+  async getReservationById(id: string): Promise<{
+    success: boolean;
+    message?: string;
+    data: Reservation;
+  }> {
+    const result = await request<{ success: boolean; data: Reservation }>(
+      `/reservations/${encodeURIComponent(id)}`
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
+    }
+
+    if (DEMO_MODE) {
+      const found =
+        FALLBACK_RESERVATIONS.find((r) => r.reservationId === id || r._id === id) ||
+        FALLBACK_RESERVATIONS[0];
+      return { success: true, data: found };
+    }
+    return { success: false, message: result.message, data: (null as unknown) as Reservation };
+  },
+
+  /**
+   * Update Reservation Status & Circulation Desk Notes (WF-19)
    */
   async updateReservationStatus(
     id: string,
     status: string,
     deskNote = ''
-  ): Promise<{ success: boolean; message: string; data: Reservation }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/reservations/${id}/status`, {
+  ): Promise<{ success: boolean; message?: string; data: Reservation }> {
+    const result = await request<{ success: boolean; message?: string; data: Reservation }>(
+      `/reservations/${encodeURIComponent(id)}/status`,
+      {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, deskNote, staffId: 'STF-4092' }),
-      });
-      if (res.ok) {
-        return await res.json();
+        body: JSON.stringify({ status, deskNote }),
       }
-    } catch {
-      // Offline fallback
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    const resItem = FALLBACK_RESERVATIONS.find(
-      (r) => r.reservationId === id || r._id === id
-    ) || FALLBACK_RESERVATIONS[0];
-    resItem.status = status as any;
-    if (deskNote) resItem.deskNote = deskNote;
-
-    return {
-      success: true,
-      message: `Reservation ${resItem.reservationId} updated to ${status}`,
-      data: resItem,
-    };
+    if (DEMO_MODE) {
+      const resItem =
+        FALLBACK_RESERVATIONS.find((r) => r.reservationId === id || r._id === id) ||
+        FALLBACK_RESERVATIONS[0];
+      resItem.status = status as Reservation['status'];
+      if (deskNote) resItem.deskNote = deskNote;
+      return {
+        success: true,
+        message: `Reservation ${resItem.reservationId} updated to ${status}`,
+        data: resItem,
+      };
+    }
+    return { success: false, message: result.message, data: (null as unknown) as Reservation };
   },
 
   /**
-   * Reject / Cancel Reservation with Reason
+   * Reject / Cancel Reservation with Reason (WF-20)
    */
   async rejectReservation(
     id: string,
     reason: string,
     explanation = ''
-  ): Promise<{ success: boolean; message: string; data: Reservation }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/reservations/${id}/reject`, {
+  ): Promise<{ success: boolean; message?: string; data: Reservation }> {
+    const result = await request<{ success: boolean; message?: string; data: Reservation }>(
+      `/reservations/${encodeURIComponent(id)}/reject`,
+      {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason, explanation, staffId: 'STF-4092' }),
-      });
-      if (res.ok) {
-        return await res.json();
+        body: JSON.stringify({ reason, explanation }),
       }
-    } catch {
-      // Offline fallback
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    const resItem = FALLBACK_RESERVATIONS.find(
-      (r) => r.reservationId === id || r._id === id
-    ) || FALLBACK_RESERVATIONS[0];
-    resItem.status = 'REJECTED';
-    resItem.rejectionReason = reason;
-    resItem.rejectionExplanation = explanation;
-
-    return {
-      success: true,
-      message: `Reservation ${resItem.reservationId} has been successfully rejected. Student notified.`,
-      data: resItem,
-    };
+    if (DEMO_MODE) {
+      const resItem =
+        FALLBACK_RESERVATIONS.find((r) => r.reservationId === id || r._id === id) ||
+        FALLBACK_RESERVATIONS[0];
+      resItem.status = 'REJECTED';
+      resItem.rejectionReason = reason;
+      resItem.rejectionExplanation = explanation;
+      return {
+        success: true,
+        message: `Reservation ${resItem.reservationId} has been successfully rejected. Student notified.`,
+        data: resItem,
+      };
+    }
+    return { success: false, message: result.message, data: (null as unknown) as Reservation };
   },
 
   /**
-   * Catalog Book Availability Management
+   * Catalog Book Availability Management (WF-21)
    */
-  async getBooks(search = ''): Promise<{ success: boolean; count: number; data: Book[] }> {
-    try {
-      const params = search ? `?search=${encodeURIComponent(search)}` : '';
-      const res = await fetch(`${API_BASE_URL}/books${params}`);
-      if (res.ok) {
-        return await res.json();
+  async getBooks(search = ''): Promise<{
+    success: boolean;
+    message?: string;
+    count: number;
+    data: Book[];
+  }> {
+    const params = search ? `?search=${encodeURIComponent(search)}` : '';
+    const result = await request<{ success: boolean; count: number; data: Book[] }>(
+      `/books${params}`
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
+    }
+
+    if (DEMO_MODE) {
+      let list = demoCopy(FALLBACK_BOOKS);
+      if (search.trim()) {
+        const q = search.toLowerCase();
+        list = list.filter(
+          (b) =>
+            b.title.toLowerCase().includes(q) ||
+            b.author.toLowerCase().includes(q) ||
+            b.shelfLocation.toLowerCase().includes(q)
+        );
       }
-    } catch {
-      // Offline fallback
+      return { success: true, count: list.length, data: list };
     }
-
-    let list = [...FALLBACK_BOOKS];
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      list = list.filter(
-        (b) =>
-          b.title.toLowerCase().includes(q) ||
-          b.author.toLowerCase().includes(q) ||
-          b.shelfLocation.toLowerCase().includes(q)
-      );
-    }
-
-    return {
-      success: true,
-      count: list.length,
-      data: list,
-    };
+    return { success: false, message: result.message, count: 0, data: [] };
   },
 
   /**
-   * Update Book Availability & Shelf Information
+   * Update Book Availability & Shelf Information (WF-21)
    */
   async updateBookAvailability(
     id: string,
     updates: Partial<Book>
-  ): Promise<{ success: boolean; message: string; data: Book }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/books/${id}/availability`, {
+  ): Promise<{ success: boolean; message?: string; data: Book }> {
+    const result = await request<{ success: boolean; message?: string; data: Book }>(
+      `/books/${encodeURIComponent(id)}/availability`,
+      {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...updates, staffId: 'STF-4092' }),
-      });
-      if (res.ok) {
-        return await res.json();
+        body: JSON.stringify(updates),
       }
-    } catch {
-      // Offline fallback
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    const book = FALLBACK_BOOKS.find((b) => b._id === id) || FALLBACK_BOOKS[0];
-    Object.assign(book, updates);
-
-    return {
-      success: true,
-      message: `Book availability updated successfully for "${book.title}"`,
-      data: book,
-    };
+    if (DEMO_MODE) {
+      const book = FALLBACK_BOOKS.find((b) => b._id === id) || FALLBACK_BOOKS[0];
+      Object.assign(book, updates);
+      return {
+        success: true,
+        message: `Book availability updated successfully for "${book.title}"`,
+        data: book,
+      };
+    }
+    return { success: false, message: result.message, data: (null as unknown) as Book };
   },
 
   /**
-   * Reading Room Floor Occupancy & Seat Map
+   * Reading Room Floor Occupancy & Seat Map (WF-22)
    */
   async getOccupancy(): Promise<{
     success: boolean;
+    message?: string;
     data: { timestamp: string; rooms: ReadingRoomInfo[] };
   }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/occupancy`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Offline fallback
+    const result = await request<{
+      success: boolean;
+      data: { timestamp: string; rooms: ReadingRoomInfo[] };
+    }>('/occupancy');
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    // Default room seats
-    const roomASeats: any[] = [];
-    const rows = ['A', 'B', 'C', 'D'];
-    rows.forEach((r) => {
-      for (let i = 1; i <= 6; i++) {
-        const num = `${r}0${i}`;
-        const isOccupied = !['A04', 'B05', 'C06', 'D01', 'D02', 'D03'].includes(num);
-        roomASeats.push({
-          _id: `seat-${num}`,
-          seatNumber: num,
-          room: 'Reading Room A',
-          floor: 'Floor 02',
-          wing: 'West Wing',
-          status: isOccupied ? 'occupied' : 'available',
-          occupiedBy: isOccupied
-            ? {
-                studentId: `ST${10000 + i}`,
-                studentName: `Student ${num}`,
-                startTime: '10:00 AM',
-                endTime: '12:00 PM',
-              }
-            : undefined,
-        });
-      }
-    });
-
+    if (DEMO_MODE) {
+      return {
+        success: true,
+        data: {
+          timestamp: new Date().toISOString(),
+          rooms: demoCopy(FALLBACK_OCCUPANCY_ROOMS),
+        },
+      };
+    }
     return {
-      success: true,
-      data: {
-        timestamp: new Date().toISOString(),
-        rooms: [
-          {
-            name: 'Reading Room A',
-            floor: 'Floor 02',
-            wing: 'West Wing',
-            totalSeats: 30,
-            occupiedSeats: 18,
-            availableSeats: 12,
-            occupancyRate: 60,
-            seats: roomASeats,
-          },
-          {
-            name: 'Reading Room B',
-            floor: 'Floor 02',
-            wing: 'East Wing',
-            totalSeats: 20,
-            occupiedSeats: 0,
-            availableSeats: 20,
-            occupancyRate: 0,
-            seats: [],
-          },
-        ],
-      },
+      success: false,
+      message: result.message,
+      data: { timestamp: new Date().toISOString(), rooms: [] },
     };
   },
 
   /**
-   * Update Interactive Seat Status
+   * Update Interactive Seat Status (WF-22)
    */
   async updateSeatStatus(
     id: string,
     status: 'available' | 'occupied'
-  ): Promise<{ success: boolean; message: string }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/occupancy/seat/${id}`, {
+  ): Promise<{ success: boolean; message?: string }> {
+    const result = await request<{ success: boolean; message?: string }>(
+      `/occupancy/seat/${encodeURIComponent(id)}`,
+      {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status, staffId: 'STF-4092' }),
-      });
-      if (res.ok) {
-        return await res.json();
+        body: JSON.stringify({ status }),
       }
-    } catch {
-      // Offline fallback
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    return {
-      success: true,
-      message: `Seat status updated to ${status}`,
-    };
+    if (DEMO_MODE) {
+      return { success: true, message: `Seat status updated to ${status}` };
+    }
+    return { success: false, message: result.message };
   },
 
   /**
-   * No-shows & Uncollected Holdings Management
+   * No-shows & Uncollected Holdings Management (WF-23)
    */
-  async getNoShows(): Promise<{ success: boolean; data: NoShowsSummaryData }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/no-shows`);
-      if (res.ok) {
-        return await res.json();
-      }
-    } catch {
-      // Offline fallback
+  async getNoShows(): Promise<{
+    success: boolean;
+    message?: string;
+    data: NoShowsSummaryData;
+  }> {
+    const result = await request<{ success: boolean; data: NoShowsSummaryData }>('/no-shows');
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    const noShowRecords = FALLBACK_RESERVATIONS.filter(
-      (r) => r.status === 'NO_SHOW' || r.status === 'CANCELLED'
-    );
-
-    return {
-      success: true,
-      data: {
-        summary: {
-          todayNoShows: 3,
-          gracePeriod: '15 min grace threshold',
-          lastUpdated: 'Live sync with circulation desk',
+    if (DEMO_MODE) {
+      const noShowRecords = demoCopy(FALLBACK_RESERVATIONS).filter(
+        (r) => r.status === 'NO_SHOW' || r.status === 'CANCELLED'
+      );
+      return {
+        success: true,
+        data: {
+          summary: {
+            todayNoShows: 3,
+            gracePeriod: '15 min grace threshold',
+            lastUpdated: 'Live sync with circulation desk',
+          },
+          records: noShowRecords,
         },
-        records: noShowRecords,
+      };
+    }
+    return {
+      success: false,
+      message: result.message,
+      data: {
+        summary: { todayNoShows: 0, gracePeriod: '', lastUpdated: '' },
+        records: [],
       },
     };
   },
 
   /**
-   * Mark Reservation as No-show & Release Resource
+   * Mark Reservation as No-show & Release Resource (WF-23)
    */
-  async markNoShow(id: string): Promise<{ success: boolean; message: string; data: Reservation }> {
-    try {
-      const res = await fetch(`${API_BASE_URL}/reservations/${id}/no-show`, {
+  async markNoShow(id: string): Promise<{
+    success: boolean;
+    message?: string;
+    data: Reservation;
+  }> {
+    const result = await request<{ success: boolean; message?: string; data: Reservation }>(
+      `/reservations/${encodeURIComponent(id)}/no-show`,
+      {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ staffId: 'STF-4092' }),
-      });
-      if (res.ok) {
-        return await res.json();
+        body: JSON.stringify({}),
       }
-    } catch {
-      // Offline fallback
+    );
+    if (result.ok && result.body?.success) {
+      return result.body;
     }
 
-    const item = FALLBACK_RESERVATIONS.find((r) => r.reservationId === id || r._id === id);
-    if (item) {
-      item.status = 'NO_SHOW';
+    if (DEMO_MODE) {
+      const item = FALLBACK_RESERVATIONS.find(
+        (r) => r.reservationId === id || r._id === id
+      );
+      if (item) {
+        item.status = 'NO_SHOW';
+      }
+      return {
+        success: true,
+        message: `Reservation ${id} marked as NO-SHOW. Resource released.`,
+        data: item || FALLBACK_RESERVATIONS[0],
+      };
     }
-
-    return {
-      success: true,
-      message: `Reservation ${id} marked as NO-SHOW. Resource released.`,
-      data: item || FALLBACK_RESERVATIONS[0],
-    };
+    return { success: false, message: result.message, data: (null as unknown) as Reservation };
   },
 };

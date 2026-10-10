@@ -1,3 +1,4 @@
+import { SymbolView } from 'expo-symbols';
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +14,7 @@ import { StaffHeader } from '../components/StaffHeader';
 import { StaffMetricCard } from '../components/StaffMetricCard';
 import { StatusBadge } from '../components/StatusBadge';
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { Reservation, StaffDashboardData } from '../types/staff.types';
 
 interface StaffDashboardScreenProps {
@@ -37,15 +39,19 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState<StaffDashboardData | null>(null);
+  const [error, setError] = useState('');
 
   const loadDashboard = async () => {
     try {
       const res = await staffApi.getDashboard();
       if (res.success) {
         setData(res.data);
+        setError('');
+      } else {
+        setError(res.message || 'Failed to load the staff dashboard.');
       }
     } catch {
-      // Handled by service fallbacks
+      setError('Failed to load the staff dashboard.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -61,11 +67,12 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
     loadDashboard();
   };
 
+  // Real zeros when the dashboard has not loaded yet — no demo numbers.
   const metrics = data?.metrics || {
-    reservationsToday: 24,
-    attentionRequired: 3,
-    occupiedSeats: 18,
-    totalSeats: 30,
+    reservationsToday: 0,
+    attentionRequired: 0,
+    occupiedSeats: 0,
+    totalSeats: 0,
   };
 
   const attentionList = data?.requiresAttention || [];
@@ -81,9 +88,15 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
         onBack={onBackToPortal}
       />
 
+      {error ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorText}>⚠️ {error}</Text>
+        </View>
+      ) : null}
+
       {loading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#2563EB" />
+          <ActivityIndicator size="large" color={staffTheme.navy} />
           <Text style={styles.loadingText}>Loading Dashboard...</Text>
         </View>
       ) : (
@@ -99,20 +112,20 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               label="Reservations Today"
               value={metrics.reservationsToday}
               onPress={onNavigateReservations}
-              accentColor="#2563EB"
+              accentColor={staffTheme.navy}
             />
             <StaffMetricCard
               label="Attention Required"
               value={metrics.attentionRequired}
               alert={metrics.attentionRequired > 0}
               onPress={onNavigateReservations}
-              accentColor="#EF4444"
+              accentColor={staffTheme.red}
             />
             <StaffMetricCard
               label="Occupied Seats"
               value={`${metrics.occupiedSeats}/${metrics.totalSeats}`}
               onPress={onNavigateRoom}
-              accentColor="#10B981"
+              accentColor={staffTheme.green}
             />
           </View>
 
@@ -123,8 +136,12 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               style={styles.actionCard}
               onPress={onNavigateReservations}
               activeOpacity={0.8}>
-              <View style={[styles.actionIconBox, { backgroundColor: '#EEF2FF' }]}>
-                <Text style={styles.actionIcon}>📋</Text>
+              <View style={[styles.actionIconBox, { backgroundColor: staffTheme.paleBlue }]}>
+                <SymbolView
+                  name={{ ios: 'calendar', android: 'calendar_month', web: 'calendar_month' }}
+                  tintColor={staffTheme.blue}
+                  size={18}
+                />
               </View>
               <Text style={styles.actionTitle}>Reservations</Text>
               <Text style={styles.actionSub}>Manage active queues</Text>
@@ -134,8 +151,12 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               style={styles.actionCard}
               onPress={onNavigateBooks}
               activeOpacity={0.8}>
-              <View style={[styles.actionIconBox, { backgroundColor: '#ECFDF5' }]}>
-                <Text style={styles.actionIcon}>📚</Text>
+              <View style={[styles.actionIconBox, { backgroundColor: staffTheme.paleGreen }]}>
+                <SymbolView
+                  name={{ ios: 'book.closed', android: 'menu_book', web: 'menu_book' }}
+                  tintColor={staffTheme.green}
+                  size={18}
+                />
               </View>
               <Text style={styles.actionTitle}>Books</Text>
               <Text style={styles.actionSub}>Availability & catalog</Text>
@@ -145,8 +166,12 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               style={styles.actionCard}
               onPress={onNavigateRoom}
               activeOpacity={0.8}>
-              <View style={[styles.actionIconBox, { backgroundColor: '#FEF3C7' }]}>
-                <Text style={styles.actionIcon}>🏛️</Text>
+              <View style={[styles.actionIconBox, { backgroundColor: staffTheme.paleAmber }]}>
+                <SymbolView
+                  name={{ ios: 'building.2', android: 'account_balance', web: 'account_balance' }}
+                  tintColor={staffTheme.amber}
+                  size={18}
+                />
               </View>
               <Text style={styles.actionTitle}>Reading Room</Text>
               <Text style={styles.actionSub}>Live floor occupancy</Text>
@@ -156,8 +181,12 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
               style={styles.actionCard}
               onPress={onNavigateNoShows}
               activeOpacity={0.8}>
-              <View style={[styles.actionIconBox, { backgroundColor: '#FEE2E2' }]}>
-                <Text style={styles.actionIcon}>⏱️</Text>
+              <View style={[styles.actionIconBox, { backgroundColor: staffTheme.paleRed }]}>
+                <SymbolView
+                  name={{ ios: 'timer', android: 'timer', web: 'timer' }}
+                  tintColor={staffTheme.red}
+                  size={18}
+                />
               </View>
               <Text style={styles.actionTitle}>No-shows</Text>
               <Text style={styles.actionSub}>Releases & cancels</Text>
@@ -215,7 +244,11 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
           {/* Operational Shift Information */}
           <View style={styles.shiftCard}>
             <View style={styles.shiftHeader}>
-              <Text style={styles.shiftIcon}>🕒</Text>
+              <SymbolView
+                name={{ ios: 'clock', android: 'schedule', web: 'schedule' }}
+                tintColor={staffTheme.navy}
+                size={16}
+              />
               <Text style={styles.shiftTitle}>Main Library Circulation Desk 01</Text>
             </View>
             <Text style={styles.shiftDetail}>
@@ -234,7 +267,7 @@ export const StaffDashboardScreen: React.FC<StaffDashboardScreenProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
   },
   centerContainer: {
     flex: 1,
@@ -244,8 +277,23 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: 12,
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
+    fontWeight: '600',
+  },
+  errorBanner: {
+    backgroundColor: staffTheme.paleRed,
+    borderColor: staffTheme.redLine,
+    borderWidth: 1,
+    borderRadius: 8,
+    marginHorizontal: 16,
+    marginTop: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  errorText: {
+    color: staffTheme.red,
+    fontSize: 13,
     fontWeight: '600',
   },
   scrollView: {
@@ -261,7 +309,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   sectionTitle: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 12,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -276,11 +324,11 @@ const styles = StyleSheet.create({
   actionCard: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 14,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
@@ -295,16 +343,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginBottom: 8,
   },
-  actionIcon: {
-    fontSize: 18,
-  },
   actionTitle: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '700',
   },
   actionSub: {
-    color: '#94A3B8',
+    color: staffTheme.muted,
     fontSize: 11,
     marginTop: 2,
   },
@@ -320,30 +365,30 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   alertCounter: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: staffTheme.paleRed,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   alertCounterText: {
-    color: '#DC2626',
+    color: staffTheme.red,
     fontSize: 10,
     fontWeight: '800',
   },
   viewAllText: {
-    color: '#2563EB',
+    color: staffTheme.navy,
     fontSize: 12,
     fontWeight: '700',
   },
   attentionCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#FECACA',
+    borderColor: staffTheme.redLine,
     borderLeftWidth: 5,
-    borderLeftColor: '#EF4444',
+    borderLeftColor: staffTheme.red,
   },
   attentionCardTop: {
     marginBottom: 12,
@@ -355,26 +400,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   attentionId: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '800',
   },
   attentionBookTitle: {
-    color: '#1E293B',
+    color: staffTheme.ink,
     fontSize: 15,
     fontWeight: '700',
     marginBottom: 2,
   },
   attentionStudent: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
     marginBottom: 6,
   },
   attentionReason: {
-    color: '#B91C1C',
+    color: staffTheme.red,
     fontSize: 12,
     fontWeight: '600',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: staffTheme.paleRed,
     padding: 8,
     borderRadius: 8,
   },
@@ -383,17 +428,17 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     gap: 8,
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: staffTheme.canvas,
     paddingTop: 10,
   },
   inspectBtn: {
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: staffTheme.canvas,
   },
   inspectBtnText: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -401,20 +446,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 8,
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
   },
   resolveBtnText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 12,
     fontWeight: '700',
   },
   shiftCard: {
-    backgroundColor: '#EFF6FF',
+    backgroundColor: staffTheme.paleBlue,
     borderRadius: 16,
     padding: 16,
     marginTop: 8,
     borderWidth: 1,
-    borderColor: '#DBEAFE',
+    borderColor: staffTheme.navyTint,
   },
   shiftHeader: {
     flexDirection: 'row',
@@ -422,21 +467,18 @@ const styles = StyleSheet.create({
     gap: 8,
     marginBottom: 4,
   },
-  shiftIcon: {
-    fontSize: 16,
-  },
   shiftTitle: {
-    color: '#1E40AF',
+    color: staffTheme.navy,
     fontSize: 13,
     fontWeight: '700',
   },
   shiftDetail: {
-    color: '#1D4ED8',
+    color: staffTheme.blue,
     fontSize: 12,
     fontWeight: '600',
   },
   shiftSub: {
-    color: '#6B7280',
+    color: staffTheme.muted,
     fontSize: 11,
     marginTop: 4,
   },

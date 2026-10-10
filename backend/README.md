@@ -2,7 +2,9 @@
 
 ## Setup
 
-Create `backend/.env` from `.env.example` and set `MONGO_URI` to the MongoDB Atlas connection string. From `backend/`, run `npm ci` and `node server.js`. The API listens on port `5001` by default.
+Create `backend/.env` and set `MONGO_URI` to your MongoDB Atlas connection string. Set `PORT=5001` to match the book frontend's default API port; without `PORT`, the server uses `5000`. From `backend/`, run `npm ci` and `node server.js`. The environment file is loaded from the backend directory even when running `node backend/server.js` from the repository root.
+
+For Atlas, use a database user's credentials and allow your computer's public IP in Atlas Network Access. Percent-encode special characters in the URI username/password. Keep the actual URI in the ignored `.env` file, never in source code or chat. The server now waits for MongoDB before listening and exits with a clear error if configuration is missing or connection fails.
 
 In Expo Go development, the app derives the API host from Expo's development host and uses port `5001`. Keep the phone and computer on the same network. Set `EXPO_PUBLIC_API_URL` in `frontend/.env` only when you need to override the API base URL; it must end in `/api`.
 

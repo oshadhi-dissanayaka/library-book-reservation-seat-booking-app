@@ -1,6 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { staffTheme } from '../theme/staffTheme';
 import { Reservation } from '../types/staff.types';
 import { StatusBadge } from './StatusBadge';
 
@@ -23,8 +24,8 @@ export const StaffReservationCard: React.FC<StaffReservationCardProps> = ({
     : `${reservation.room || 'Reading Room'} • ${reservation.seatNumber || 'Seat'}`;
 
   const detailInfo = isBook
-    ? `${reservation.pickupDate || 'Today'} • ${reservation.pickupLocation || 'Desk 01'}`
-    : `${reservation.pickupDate || 'Today'} • ${reservation.timeSlot || '10:00 AM - 12:00 PM'}`;
+    ? `${reservation.pickupDate || '—'} • ${reservation.pickupLocation || '—'}`
+    : `${reservation.pickupDate || '—'} • ${reservation.timeSlot || '—'}`;
 
   const hasAlert = reservation.requiresAttention || reservation.status === 'EXCEPTION';
 
@@ -37,7 +38,9 @@ export const StaffReservationCard: React.FC<StaffReservationCardProps> = ({
         <View style={styles.idRow}>
           <Text style={styles.idText}>{reservation.reservationId}</Text>
           <View style={[styles.typeBadge, isBook ? styles.bookType : styles.seatType]}>
-            <Text style={styles.typeText}>{reservation.type}</Text>
+            <Text style={[styles.typeText, !isBook && styles.typeTextSeat]}>
+              {reservation.type}
+            </Text>
           </View>
         </View>
         <StatusBadge status={reservation.status} />
@@ -98,22 +101,22 @@ export const StaffReservationCard: React.FC<StaffReservationCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
-    shadowColor: '#0F172A',
+    borderColor: staffTheme.line,
+    shadowColor: staffTheme.ink,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
     shadowRadius: 6,
     elevation: 2,
   },
   alertBorder: {
-    borderColor: '#FCA5A5',
+    borderColor: staffTheme.redLine,
     borderLeftWidth: 4,
-    borderLeftColor: '#EF4444',
+    borderLeftColor: staffTheme.red,
   },
   topRow: {
     flexDirection: 'row',
@@ -127,7 +130,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   idText: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -139,26 +142,29 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   bookType: {
-    backgroundColor: '#EEF2FF',
-    borderColor: '#C7D2FE',
+    backgroundColor: staffTheme.paleBlue,
+    borderColor: staffTheme.navyTint,
   },
   seatType: {
-    backgroundColor: '#F3E8FF',
-    borderColor: '#DDD6FE',
+    backgroundColor: staffTheme.paleAmber,
+    borderColor: staffTheme.amberLine,
   },
   typeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#4338CA',
+    color: staffTheme.blue,
+  },
+  typeTextSeat: {
+    color: staffTheme.amber,
   },
   title: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 2,
   },
   subtitle: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
     marginBottom: 8,
   },
@@ -172,22 +178,22 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: '#E2E8F0',
+    backgroundColor: staffTheme.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarMiniText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#334155',
+    color: staffTheme.ink,
   },
   studentName: {
-    color: '#334155',
+    color: staffTheme.ink,
     fontSize: 13,
     fontWeight: '600',
   },
   studentId: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
   },
   metaRow: {
@@ -196,17 +202,17 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   metaText: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
   },
   attentionBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FEF2F2',
+    backgroundColor: staffTheme.paleRed,
     padding: 9,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#FEE2E2',
+    borderColor: staffTheme.redLine,
     marginBottom: 10,
     gap: 6,
   },
@@ -214,7 +220,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   attentionText: {
-    color: '#991B1B',
+    color: staffTheme.red,
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
@@ -224,23 +230,23 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F1F5F9',
+    borderTopColor: staffTheme.canvas,
     paddingTop: 10,
     marginTop: 2,
   },
   viewDetailsText: {
-    color: '#2563EB',
+    color: staffTheme.navy,
     fontSize: 12,
     fontWeight: '700',
   },
   quickActionButton: {
-    backgroundColor: '#1E293B',
+    backgroundColor: staffTheme.navy,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 8,
   },
   quickActionText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 11,
     fontWeight: '700',
   },

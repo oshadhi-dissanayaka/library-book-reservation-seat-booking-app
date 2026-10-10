@@ -1,7 +1,6 @@
 import { useCallback, useState } from 'react';
-import Constants from 'expo-constants';
-import { useFocusEffect } from 'expo-router';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, useFocusEffect } from 'expo-router';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 /**
  * WF-15 — Notifications (IT3060 HCI Milestone 03)
@@ -9,19 +8,24 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-nat
  * LOCAL / IN-APP ONLY.
  * There is NO notification backend, no scheduled jobs and no push
  * notification service in this project. This screen builds a simple
- * notification list ON THE DEVICE from the existing reservation data:
- *   GET /api/reservations   -> demo-student's reservations
- *   GET /api/reading-rooms  -> room names for the messages
+ * notification list ON THE DEVICE from the CURRENT student's persisted
+ * reservation data:
+ *   GET /api/seat-reservations?studentId=...  -> this student's records
+ *   GET /api/reading-rooms                    -> room names for the messages
  *
  * Events generated locally:
  *   - "Seat reservation confirmed"  (one per active reservation)
  *   - "Reservation reminder"        (UI representation only — it is
  *     NOT a scheduled or delivered push notification)
+ *   - "Reservation cancelled"       (one per cancelled reservation)
+ *
+ * Tapping a reservation-related item opens WF-14 (/reservations/[id]).
  */
 
-// Backend address (same convention as the other screens).
-const API_HOST = Constants.expoConfig?.hostUri?.split(':')[0] ?? 'localhost';
-const API_BASE_URL = `http://${API_HOST}:5000`;
+// Backend address — shared API configuration (src/lib/api.ts): the Expo
+// dev-server host (works on a physical phone) and the backend's port 5000.
+import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
+import { studentIdQuery } from '@/lib/student-identity';
 
 type Reservation = {
   _id: string;
@@ -40,11 +44,12 @@ type RoomInfo = {
 
 type NotificationItem = {
   key: string;
-  kind: 'confirmed' | 'reminder';
+  kind: 'confirmed' | 'reminder' | 'cancelled';
   title: string;
   message: string;
   detail: string;
   when: string;
+  reservationId?: string;
 };
 
 const MONTH_NAMES = [
@@ -80,7 +85,10 @@ export default function NotificationsScreen() {
         setLoading(true);
         setError('');
         try {
-          const reservationsResponse = await fetch(`${API_BASE_URL}/api/reservations`);
+          // This student's reservations only (active + cancelled).
+          const reservationsResponse = await fetch(
+            `${API_BASE_URL}/api/seat-reservations?${studentIdQuery()}`
+          );
           if (!reservationsResponse.ok) {
             throw new Error(`Server responded with status ${reservationsResponse.status}`);
           }
@@ -122,34 +130,48 @@ export default function NotificationsScreen() {
     }, [])
   );
 
-  // Build the local notification list from the active reservations.
+  // Build the local notification list from this student's reservations.
   const items: NotificationItem[] = [];
-  reservations
-    .filter((reservation) => reservation.status === 'active')
-    .forEach((reservation) => {
-      const room = rooms.find((item) => item._id === reservation.readingRoom);
-      const roomName = room?.name ?? 'reading room';
-      const seatLabel = `Seat ${reservation.seatNumber}`;
-      const when = formatIsoDate(reservation.date);
+  reservations.forEach((reservation) => {
+    const room = rooms.find((item) => item._id === reservation.readingRoom);
+    const roomName = room?.name ?? 'reading room';
+    const seatLabel = `Seat ${reservation.seatNumber}`;
+    const when = formatIsoDate(reservation.date);
 
+    if (reservation.status !== 'active') {
+      // Cancelled bookings still happened — surface them as history.
       items.push({
-        key: `${reservation._id}-confirmed`,
-        kind: 'confirmed',
-        title: 'Seat reservation confirmed',
-        message: `${roomName} — ${seatLabel} is reserved for you.`,
+        key: `${reservation._id}-cancelled`,
+        kind: 'cancelled',
+        title: 'Reservation cancelled',
+        message: `Your reservation for ${seatLabel} at ${roomName} was cancelled.`,
         detail: `${confirmationCodeFor(reservation._id)} · ${reservation.time}`,
         when,
+        reservationId: reservation._id,
       });
+      return;
+    }
 
-      items.push({
-        key: `${reservation._id}-reminder`,
-        kind: 'reminder',
-        title: 'Reservation reminder',
-        message: `Please arrive 15 minutes before your session at ${roomName} and carry your Student ID.`,
-        detail: `${seatLabel} · ${reservation.time}`,
-        when,
-      });
+    items.push({
+      key: `${reservation._id}-confirmed`,
+      kind: 'confirmed',
+      title: 'Seat reservation confirmed',
+      message: `${roomName} — ${seatLabel} is reserved for you.`,
+      detail: `${confirmationCodeFor(reservation._id)} · ${reservation.time}`,
+      when,
+      reservationId: reservation._id,
     });
+
+    items.push({
+      key: `${reservation._id}-reminder`,
+      kind: 'reminder',
+      title: 'Reservation reminder',
+      message: `Please arrive 15 minutes before your session at ${roomName} and carry your Student ID.`,
+      detail: `${seatLabel} · ${reservation.time}`,
+      when,
+      reservationId: reservation._id,
+    });
+  });
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -194,12 +216,26 @@ export default function NotificationsScreen() {
       {!loading &&
         error === '' &&
         items.map((item) => (
-          <View key={item.key} style={styles.card}>
+          <Pressable
+            key={item.key}
+            accessibilityRole="button"
+            accessibilityLabel={`${item.title}. ${item.message} Open reservation details.`}
+            style={styles.card}
+            onPress={() => {
+              // Reservation-related notifications open WF-14.
+              if (item.reservationId) {
+                router.push({
+                  pathname: '/reservations/[id]',
+                  params: { id: item.reservationId },
+                });
+              }
+            }}>
             <View style={styles.cardHeader}>
               <View
                 style={[
                   styles.kindDot,
                   item.kind === 'reminder' && styles.kindDotReminder,
+                  item.kind === 'cancelled' && styles.kindDotCancelled,
                 ]}
               />
               <Text style={styles.itemTitle}>{item.title}</Text>
@@ -211,18 +247,27 @@ export default function NotificationsScreen() {
                 style={[
                   styles.kindChip,
                   item.kind === 'reminder' && styles.kindChipReminder,
+                  item.kind === 'cancelled' && styles.kindChipCancelled,
                 ]}>
                 <Text
                   style={[
                     styles.kindChipText,
                     item.kind === 'reminder' && styles.kindChipTextReminder,
+                    item.kind === 'cancelled' && styles.kindChipTextCancelled,
                   ]}>
-                  {item.kind === 'confirmed' ? 'Confirmed' : 'Reminder'}
+                  {item.kind === 'confirmed'
+                    ? 'Confirmed'
+                    : item.kind === 'cancelled'
+                      ? 'Cancelled'
+                      : 'Reminder'}
                 </Text>
               </View>
               <Text style={styles.itemDetail}>{item.detail}</Text>
             </View>
-          </View>
+            {item.reservationId && (
+              <Text style={styles.openDetails}>Open reservation ›</Text>
+            )}
+          </Pressable>
         ))}
     </ScrollView>
   );
@@ -320,6 +365,9 @@ const styles = StyleSheet.create({
   kindDotReminder: {
     backgroundColor: '#1D4ED8',
   },
+  kindDotCancelled: {
+    backgroundColor: '#B91C1C',
+  },
   itemTitle: {
     fontSize: 15,
     fontWeight: '800',
@@ -351,6 +399,9 @@ const styles = StyleSheet.create({
   kindChipReminder: {
     backgroundColor: '#EEF1F8',
   },
+  kindChipCancelled: {
+    backgroundColor: '#FDECEC',
+  },
   kindChipText: {
     fontSize: 11,
     fontWeight: '800',
@@ -360,9 +411,17 @@ const styles = StyleSheet.create({
   kindChipTextReminder: {
     color: '#1D4ED8',
   },
+  kindChipTextCancelled: {
+    color: '#B91C1C',
+  },
   itemDetail: {
     fontSize: 13,
     fontWeight: '600',
     color: '#7A8199',
+  },
+  openDetails: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#1D4ED8',
   },
 });

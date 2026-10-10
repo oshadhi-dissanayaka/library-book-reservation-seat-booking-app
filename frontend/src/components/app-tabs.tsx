@@ -3,6 +3,7 @@ import { SymbolView } from 'expo-symbols';
 import { Image, useColorScheme } from 'react-native';
 
 import { NotificationButton } from '@/components/notification-button';
+import { RoleGatewayButton } from '@/components/role-gateway-button';
 import { Colors } from '@/constants/theme';
 
 export default function AppTabs() {
@@ -11,18 +12,20 @@ export default function AppTabs() {
 
   return (
     <Tabs
+      initialRouteName="home"
       screenOptions={{
         headerTitle: '',
         headerShadowVisible: false,
         headerStyle: { backgroundColor: colors.background },
         headerRight: () => <NotificationButton />,
+        headerLeft: () => <RoleGatewayButton />,
         tabBarActiveTintColor: colors.text,
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: { backgroundColor: colors.background },
         tabBarLabelStyle: { fontSize: 10 },
       }}>
       <Tabs.Screen
-        name="index"
+        name="home"
         options={{
           title: 'Home',
           tabBarIcon: ({ color, size }) => (
@@ -35,25 +38,12 @@ export default function AppTabs() {
       />
 
       <Tabs.Screen
-        name="explore"
+        name="books"
         options={{
-          title: 'Explore',
-          tabBarIcon: ({ color, size }) => (
-            <Image
-              source={require('@/assets/images/tabIcons/explore.png')}
-              style={{ width: size, height: size, tintColor: color }}
-            />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="reading-rooms"
-        options={{
-          title: 'Reading Rooms',
+          title: 'Books',
           tabBarIcon: ({ color, size }) => (
             <SymbolView
-              name={{ ios: 'book.closed', android: 'menu_book', web: 'menu_book' }}
+              name={{ ios: 'book', android: 'menu_book', web: 'menu_book' }}
               tintColor={color}
               size={size}
             />
@@ -62,7 +52,21 @@ export default function AppTabs() {
       />
 
       <Tabs.Screen
-        name="reservations"
+        name="reading-rooms"
+        options={{
+          title: 'Seats',
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView
+              name={{ ios: 'chair.lounge', android: 'event_seat', web: 'event_seat' }}
+              tintColor={color}
+              size={size}
+            />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="my-reservations"
         options={{
           title: 'Reservations',
           tabBarIcon: ({ color, size }) => (
@@ -75,7 +79,19 @@ export default function AppTabs() {
         }}
       />
 
-      <Tabs.Screen name="notifications" options={{ href: null }} />
+      {/* Notifications stays registered but is reached via the header bell. */}
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: 'Notifications',
+          href: null,
+          tabBarIcon: ({ color, size }) => (
+            <SymbolView name={{ ios: 'bell', android: 'notifications', web: 'notifications' }} tintColor={color} size={size} />
+          ),
+        }}
+      />
+      <Tabs.Screen name="explore" options={{ href: null, title: 'Book Reservations' }} />
+      <Tabs.Screen name="reservations" options={{ href: null, title: 'Seat Reservations' }} />
     </Tabs>
   );
 }

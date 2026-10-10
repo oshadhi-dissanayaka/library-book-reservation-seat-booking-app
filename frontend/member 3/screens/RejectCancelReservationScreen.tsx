@@ -15,6 +15,7 @@ import {
 import { ConfirmationModal } from '../components/ConfirmationModal';
 import { StaffHeader } from '../components/StaffHeader';
 import { staffApi } from '../services/staffApi';
+import { staffTheme } from '../theme/staffTheme';
 import { Reservation } from '../types/staff.types';
 
 interface RejectCancelReservationScreenProps {
@@ -149,7 +150,7 @@ export const RejectCancelReservationScreen: React.FC<
               multiline
               numberOfLines={4}
               placeholder="Enter explanation to be logged and sent to student..."
-              placeholderTextColor="#94A3B8"
+              placeholderTextColor={staffTheme.placeholder}
               textAlignVertical="top"
             />
           </View>
@@ -173,7 +174,7 @@ export const RejectCancelReservationScreen: React.FC<
             disabled={loading}
             activeOpacity={0.8}>
             {loading ? (
-              <ActivityIndicator color="#FFFFFF" />
+              <ActivityIndicator color={staffTheme.white} />
             ) : (
               <Text style={styles.rejectSubmitText}>REJECT RESERVATION</Text>
             )}
@@ -208,7 +209,7 @@ export const RejectCancelReservationScreen: React.FC<
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
   },
   keyboardAvoid: {
     flex: 1,
@@ -218,12 +219,12 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   targetCard: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 20,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
   },
   targetIdRow: {
     flexDirection: 'row',
@@ -232,44 +233,44 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   targetId: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '800',
   },
   typeTag: {
-    backgroundColor: '#EEF2FF',
+    backgroundColor: staffTheme.paleBlue,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
   },
   typeTagText: {
-    color: '#4F46E5',
+    color: staffTheme.blue,
     fontSize: 11,
     fontWeight: '700',
   },
   targetTitle: {
-    color: '#1E293B',
+    color: staffTheme.ink,
     fontSize: 17,
     fontWeight: '700',
     marginBottom: 4,
   },
   targetStudent: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 13,
   },
   errorBox: {
-    backgroundColor: '#FEE2E2',
+    backgroundColor: staffTheme.paleRed,
     padding: 12,
     borderRadius: 10,
     marginBottom: 16,
   },
   errorText: {
-    color: '#B91C1C',
+    color: staffTheme.red,
     fontSize: 13,
     fontWeight: '600',
   },
   sectionLabel: {
-    color: '#475569',
+    color: staffTheme.muted,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
@@ -282,66 +283,66 @@ const styles = StyleSheet.create({
   reasonOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     padding: 14,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     gap: 12,
   },
   selectedReasonOption: {
-    borderColor: '#DC2626',
-    backgroundColor: '#FEF2F2',
+    borderColor: staffTheme.red,
+    backgroundColor: staffTheme.paleRed,
   },
   radioCircle: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#CBD5E1',
+    borderColor: staffTheme.line,
     alignItems: 'center',
     justifyContent: 'center',
   },
   selectedRadio: {
-    borderColor: '#DC2626',
+    borderColor: staffTheme.red,
   },
   radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#DC2626',
+    backgroundColor: staffTheme.red,
   },
   reasonText: {
-    color: '#334155',
+    color: staffTheme.ink,
     fontSize: 14,
     fontWeight: '600',
     flex: 1,
   },
   selectedReasonText: {
-    color: '#991B1B',
+    color: staffTheme.red,
     fontWeight: '700',
   },
   textAreaContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
     padding: 12,
     marginBottom: 20,
   },
   textArea: {
     fontSize: 14,
-    color: '#0F172A',
+    color: staffTheme.ink,
     minHeight: 80,
   },
   notificationAlert: {
     flexDirection: 'row',
-    backgroundColor: '#EFF6FF',
+    backgroundColor: staffTheme.paleBlue,
     borderRadius: 12,
     padding: 14,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: staffTheme.navyTint,
     gap: 10,
   },
   alertIcon: {
@@ -351,30 +352,30 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   alertHeading: {
-    color: '#1E40AF',
+    color: staffTheme.navy,
     fontSize: 13,
     fontWeight: '700',
     marginBottom: 2,
   },
   alertBody: {
-    color: '#3B82F6',
+    color: staffTheme.blue,
     fontSize: 12,
     lineHeight: 16,
   },
   rejectSubmitButton: {
-    backgroundColor: '#DC2626',
+    backgroundColor: staffTheme.red,
     borderRadius: 14,
     paddingVertical: 14,
     alignItems: 'center',
     marginBottom: 12,
-    shadowColor: '#DC2626',
+    shadowColor: staffTheme.red,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   rejectSubmitText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 15,
     fontWeight: '800',
     letterSpacing: 0.5,
@@ -384,7 +385,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   cancelLinkText: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 14,
     fontWeight: '600',
   },

@@ -1,6 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
+import { staffTheme } from '../theme/staffTheme';
+
 interface StaffMetricCardProps {
   label: string;
   value: string | number;
@@ -51,7 +53,7 @@ export const StaffMetricCard: React.FC<StaffMetricCardProps> = ({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: staffTheme.white,
     borderRadius: 16,
     padding: 16,
     flex: 1,
@@ -62,15 +64,15 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: staffTheme.line,
   },
   highlightCard: {
-    borderColor: '#3B82F6',
-    backgroundColor: '#F8FAFC',
+    borderColor: staffTheme.blue,
+    backgroundColor: staffTheme.canvas,
   },
   alertCard: {
-    borderColor: '#FCA5A5',
-    backgroundColor: '#FEF2F2',
+    borderColor: staffTheme.redLine,
+    backgroundColor: staffTheme.paleRed,
   },
   headerRow: {
     flexDirection: 'row',
@@ -79,43 +81,43 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   label: {
-    color: '#64748B',
+    color: staffTheme.muted,
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
   },
   alertLabel: {
-    color: '#991B1B',
+    color: staffTheme.red,
   },
   value: {
-    color: '#0F172A',
+    color: staffTheme.ink,
     fontSize: 24,
     fontWeight: '800',
   },
   alertValue: {
-    color: '#DC2626',
+    color: staffTheme.red,
   },
   alertPill: {
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: '#EF4444',
+    backgroundColor: staffTheme.red,
     alignItems: 'center',
     justifyContent: 'center',
   },
   alertPillText: {
-    color: '#FFFFFF',
+    color: staffTheme.white,
     fontSize: 12,
     fontWeight: '900',
   },
   badgePill: {
-    backgroundColor: '#E0F2FE',
+    backgroundColor: staffTheme.paleBlue,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 8,
   },
   badgePillText: {
-    color: '#0284C7',
+    color: staffTheme.blue,
     fontSize: 10,
     fontWeight: '700',
   },

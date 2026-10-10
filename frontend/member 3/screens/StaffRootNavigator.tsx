@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { SafeAreaView, StyleSheet, View } from 'react-native';
 
 import { StaffBottomTabs, StaffTabName } from '../components/StaffBottomTabs';
+import { staffTheme } from '../theme/staffTheme';
 import { Reservation, StaffUser } from '../types/staff.types';
 import { BookAvailabilityManagementScreen } from './BookAvailabilityManagementScreen';
 import { NoShowCancellationScreen } from './NoShowCancellationScreen';
@@ -154,7 +155,6 @@ export const StaffRootNavigator: React.FC<StaffRootNavigatorProps> = ({
           <StaffBottomTabs
             currentTab={activeTab}
             onSelectTab={handleSelectTab}
-            badgeCounts={{ exceptions: 2 }}
           />
         )}
       </View>
@@ -165,10 +165,10 @@ export const StaffRootNavigator: React.FC<StaffRootNavigatorProps> = ({
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: staffTheme.canvas,
   },
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: staffTheme.canvas,
   },
 });

@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import {
   ActivityIndicator,
@@ -19,12 +18,9 @@ import {
  * selected on WF-10 (after the room is known), not here.
  */
 
-// Backend address. The project has no shared API config yet, so the host is
-// taken from the address the device used to reach the Expo dev server — this
-// works on a physical phone, an emulator, and web without editing any config
-// file. Port 5000 is the backend default (see backend/server.js).
-const API_HOST = Constants.expoConfig?.hostUri?.split(':')[0] ?? 'localhost';
-const API_BASE_URL = `http://${API_HOST}:5000`;
+// Backend address — shared API configuration (src/lib/api.ts): the Expo
+// dev-server host (works on a physical phone) and the backend's port 5000.
+import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
 
 type ReadingRoom = {
   _id: string;
@@ -296,9 +292,13 @@ export default function ReadingRoomSearchScreen() {
                 // chosen on WF-10 as a fixed 2-hour block.
                 router.push({
                   pathname: '/reading-rooms/[id]/seats',
-                  // WF-09 stores the date as ISO. WF-10 currently accepts its
-                  // existing friendly route label and converts it back to ISO.
-                  params: { id: selectedRoom._id, date: selectedDateOption.label },
+                  params: {
+                    id: selectedRoom._id,
+                    // `isoDate` is what the APIs use ("YYYY-MM-DD"); `date`
+                    // stays the friendly label purely for display on WF-10.
+                    isoDate: selectedDate,
+                    date: selectedDateOption.label,
+                  },
                 });
               }}>
               <Text style={styles.primaryButtonText}>VIEW AVAILABLE SEATS →</Text>

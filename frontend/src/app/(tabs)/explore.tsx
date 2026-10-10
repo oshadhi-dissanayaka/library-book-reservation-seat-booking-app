@@ -161,14 +161,14 @@ export default function ReservationsScreen() {
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void findReservations(patronId, true)} tintColor={palette.navy} />}>
         <View style={styles.topBar}>
-          <Link href="/" asChild>
-            <Pressable style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Back to book catalog">
+          <Link href={{ pathname: '/my-reservations', params: { patronId } }} asChild>
+            <Pressable style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Back to My Reservations">
               <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} tintColor={palette.navy} size={17} />
             </Pressable>
           </Link>
           <View style={styles.headerCopy}>
             <Text style={styles.eyebrow}>UNIVERSITY LIBRARY</Text>
-            <Text style={styles.title}>My reservations</Text>
+            <Text style={styles.title}>Book Reservations</Text>
           </View>
           <View style={styles.headerIcon}><SymbolView name={{ ios: 'bookmark.fill', android: 'bookmark', web: 'bookmark' }} tintColor={palette.white} size={17} /></View>
         </View>
@@ -253,7 +253,7 @@ export default function ReservationsScreen() {
                     <Text style={styles.clearFiltersText}>Show any date</Text>
                   </Pressable>
                 ) : activeTab === 'active' ? (
-                  <Link href="/" asChild><Pressable style={({ pressed }) => [styles.catalogButton, pressed && styles.pressed]}><Text style={styles.catalogButtonText}>Browse catalog</Text><SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} tintColor={palette.white} size={15} /></Pressable></Link>
+                  <Link href="/books" asChild><Pressable style={({ pressed }) => [styles.catalogButton, pressed && styles.pressed]}><Text style={styles.catalogButtonText}>Browse catalog</Text><SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} tintColor={palette.white} size={15} /></Pressable></Link>
                 ) : null}
               </View>
             ) : (

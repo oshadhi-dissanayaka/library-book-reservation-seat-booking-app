@@ -49,6 +49,10 @@ export function ManagementBottomBar({ currentTab }: ManagementBottomBarProps) {
 
   return (
     <View className="absolute bottom-0 left-0 right-0 flex-row border-t border-slate-100 bg-white px-2 pb-6 pt-3 shadow-sm">
+      <Pressable onPress={() => router.replace('/portal')} accessibilityRole="button" accessibilityLabel="Back to Role Selection" className="items-center justify-center px-2 py-1">
+        <Ionicons name="arrow-back" size={22} color="#64748B" />
+        <Text className="mt-1 text-[11px] text-slate-500">Portal</Text>
+      </Pressable>
       {tabs.map((tab) => {
         const isActive = currentTab === tab.id;
         const iconName = isActive ? tab.iconActive : tab.iconInactive;

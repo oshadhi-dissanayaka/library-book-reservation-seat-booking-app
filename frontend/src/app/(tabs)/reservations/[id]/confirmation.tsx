@@ -1,17 +1,33 @@
+import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 /**
  * WF-12 — Reservation Confirmation (IT3060 HCI Milestone 03)
  *
- * Reached from the WF-10 seat grid after POST /api/reservations
- * succeeds. All details arrive as route params (no extra endpoint):
- *   id, confirmationCode, roomName, building, floor, date, time,
- *   blockCount, seatNumber, status
+ * Reached from the WF-10 seat grid after POST /api/seat-reservations
+ * succeeds. The screen shows what was ACTUALLY persisted:
+ *   GET /api/seat-reservations/:id  (real record + confirmation code)
+ * Route params remain as a fallback if that request fails, so the user
+ * still sees their booking rather than an error page.
  *
  * Shares the WF-09/WF-10 visual language: off-white background,
  * white rounded cards, dark blue primary action.
  */
+
+// Backend address — shared API configuration (src/lib/api.ts): the Expo
+// dev-server host (works on a physical phone) and the backend's port 5000.
+import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
+import { studentIdQuery } from '@/lib/student-identity';
+
+type PersistedReservation = {
+  _id?: string;
+  date?: string;
+  time?: string;
+  seatNumber?: number;
+  status?: string;
+  readingRoom?: string | { name?: string; building?: string; floor?: string };
+};
 
 export default function ReservationConfirmationScreen() {
   const params = useLocalSearchParams<{
@@ -28,16 +44,75 @@ export default function ReservationConfirmationScreen() {
   }>();
 
   const id = params.id ?? '';
-  const status = params.status ?? 'active';
+
+  // Real persisted reservation — the source of truth when it loads.
+  const [persisted, setPersisted] = useState<PersistedReservation | null>(null);
+  const [loadingRecord, setLoadingRecord] = useState(id !== '');
+  const [recordFailed, setRecordFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    // loadingRecord already starts false when there is no id to fetch.
+    if (id === '') {
+      return () => {
+        active = false;
+      };
+    }
+
+    const loadRecord = async () => {
+      try {
+        const response = await fetch(
+          `${API_BASE_URL}/api/seat-reservations/${encodeURIComponent(id)}?${studentIdQuery()}`
+        );
+        if (!response.ok) {
+          throw new Error(`Server responded with status ${response.status}`);
+        }
+        const data = (await response.json()) as {
+          reservation?: PersistedReservation;
+          confirmationCode?: string;
+        };
+        if (active && data.reservation) {
+          setPersisted(data.reservation);
+        }
+      } catch {
+        // Keep showing the route params below instead of failing the screen.
+        if (active) setRecordFailed(true);
+      } finally {
+        if (active) setLoadingRecord(false);
+      }
+    };
+
+    loadRecord();
+    return () => {
+      active = false;
+    };
+  }, [id]);
+
+  const room =
+    typeof persisted?.readingRoom === 'object' ? persisted.readingRoom : null;
+
+  const status = persisted?.status ?? params.status ?? 'active';
   const blockCount = Math.max(1, Number(params.blockCount) || 1);
 
   const statusLabel =
     status === 'active' ? 'Active' : status === 'cancelled' ? 'Cancelled' : status;
 
-  // Prefer the code sent by the API; fall back to deriving it from the id.
-  const referenceCode =
-    params.confirmationCode ||
-    (id ? `RES-SEAT-${id.slice(-4).toUpperCase()}` : 'N/A');
+  // Prefer the persisted record, then the code sent by POST, then derive it.
+  const referenceCode = recordFailed
+    ? params.confirmationCode ||
+      (id ? `RES-SEAT-${id.slice(-4).toUpperCase()}` : 'N/A')
+    : persisted
+      ? `RES-SEAT-${String(persisted._id ?? id).slice(-4).toUpperCase()}`
+      : params.confirmationCode ||
+        (id ? `RES-SEAT-${id.slice(-4).toUpperCase()}` : 'N/A');
+
+  const displayDate = persisted?.date ?? params.date;
+  const displayTime = persisted?.time ?? params.time;
+  const displaySeat = persisted?.seatNumber ?? params.seatNumber;
+  const displayRoomName = room?.name ?? params.roomName;
+  const displayBuilding = room?.building ?? params.building;
+  const displayFloor = room?.floor ?? params.floor;
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -54,7 +129,7 @@ export default function ReservationConfirmationScreen() {
         </View>
         <Text style={styles.heading}>Reservation Confirmed</Text>
         <Text style={styles.subtitle}>
-          Your seat at {params.roomName || 'the reading room'} has been reserved
+          Your seat at {displayRoomName || 'the reading room'} has been reserved
           successfully.
         </Text>
       </View>
@@ -63,6 +138,13 @@ export default function ReservationConfirmationScreen() {
       <View style={styles.card}>
         <Text style={styles.cardTitle}>Reservation details</Text>
 
+        {loadingRecord && (
+          <View style={styles.loadingRow}>
+            <ActivityIndicator size="small" color="#1E3A8A" />
+            <Text style={styles.loadingText}>Verifying your reservation…</Text>
+          </View>
+        )}
+
         <View style={styles.referenceRow}>
           <Text style={styles.referenceLabel}>Reference ID</Text>
           <Text style={styles.referenceValue}>{referenceCode}</Text>
@@ -70,22 +152,22 @@ export default function ReservationConfirmationScreen() {
 
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Reading room</Text>
-          <Text style={styles.detailValue}>{params.roomName || '—'}</Text>
+          <Text style={styles.detailValue}>{displayRoomName || '—'}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Building / Floor</Text>
           <Text style={styles.detailValue}>
-            {params.building || '—'}
-            {params.floor ? ` / ${params.floor}` : ''}
+            {displayBuilding || '—'}
+            {displayFloor ? ` / ${displayFloor}` : ''}
           </Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Date</Text>
-          <Text style={styles.detailValue}>{params.date || '—'}</Text>
+          <Text style={styles.detailValue}>{displayDate || '—'}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Time</Text>
-          <Text style={styles.detailValue}>{params.time || '—'}</Text>
+          <Text style={styles.detailValue}>{displayTime || '—'}</Text>
         </View>
         {blockCount > 1 && (
           <View style={styles.detailRow}>
@@ -95,7 +177,7 @@ export default function ReservationConfirmationScreen() {
         )}
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Seat number</Text>
-          <Text style={styles.detailValue}>{params.seatNumber || '—'}</Text>
+          <Text style={styles.detailValue}>{displaySeat || '—'}</Text>
         </View>
         <View style={styles.detailRow}>
           <Text style={styles.detailLabel}>Status</Text>
@@ -127,7 +209,7 @@ export default function ReservationConfirmationScreen() {
         accessibilityRole="button"
         accessibilityLabel="View my reservations"
         style={styles.secondaryButton}
-        onPress={() => router.push('/reservations')}>
+        onPress={() => router.push('/my-reservations')}>
         <Text style={styles.secondaryButtonText}>VIEW MY RESERVATIONS</Text>
       </Pressable>
       <Pressable
@@ -231,6 +313,18 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '800',
     color: '#12203F',
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 4,
+  },
+  loadingText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#4A5165',
   },
   referenceRow: {
     flexDirection: 'row',
