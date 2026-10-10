@@ -81,6 +81,7 @@ const getDashboard = async (req, res) => {
  */
 const getBookUsageReport = async (req, res) => {
   try {
+    const periodParam = String(req.query.period || "Monthly").toLowerCase();
     const [bookCount, books] = await Promise.all([
       Book.countDocuments(),
       Book.find().lean(),
@@ -111,24 +112,71 @@ const getBookUsageReport = async (req, res) => {
       { code: "CS-405", name: "Algorithms", count: 164, unit: "vol", pct: 57 },
     ];
 
-    const bookUsageData = {
-      period: "Sep 2026",
-      totalBooks: bookCount > 0 ? bookCount : 1248,
-      circulatedVolumes: bookCount > 0 ? bookCount * 12 : 1248,
-      growthVsAug: "+12.4% vs Aug",
-      regularLoans: Math.round((bookCount || 100) * 8.5),
-      courseReserves: Math.round((bookCount || 100) * 2),
-      topCategories: categoriesArray.length > 0 ? categoriesArray : fallbackCategories,
-      usageTrend: {
-        type: "Weekly Circulation Volume",
+    const activeCategories = categoriesArray.length > 0 ? categoriesArray : fallbackCategories;
+
+    let period = "Sep 2026";
+    let circulatedVolumes = bookCount > 0 ? bookCount * 12 : 1248;
+    let growthVsAug = "+12.4% vs Aug";
+    let regularLoans = Math.round((bookCount || 100) * 8.5);
+    let courseReserves = Math.round((bookCount || 100) * 2);
+    let usageTrend = {
+      type: "Weekly Circulation Volume",
+      weeks: [
+        { week: "W1", count: 275, heightPct: 50 },
+        { week: "W2", count: 310, heightPct: 65 },
+        { week: "W3", count: 385, heightPct: 95 },
+        { week: "W4", count: 278, heightPct: 52 },
+      ],
+      note: "Peak circulation observed in Week 3 aligned with Midterm project deadlines.",
+    };
+
+    if (periodParam === "weekly") {
+      period = "Sep 15 – Sep 21, 2026";
+      circulatedVolumes = 310;
+      growthVsAug = "+6.2% vs last week";
+      regularLoans = 245;
+      courseReserves = 65;
+      usageTrend = {
+        type: "Daily Circulation Volume",
         weeks: [
-          { week: "W1", count: 275, heightPct: 50 },
-          { week: "W2", count: 310, heightPct: 65 },
-          { week: "W3", count: 385, heightPct: 95 },
-          { week: "W4", count: 278, heightPct: 52 },
+          { week: "Mon", count: 48, heightPct: 65 },
+          { week: "Tue", count: 56, heightPct: 76 },
+          { week: "Wed", count: 72, heightPct: 98 },
+          { week: "Thu", count: 52, heightPct: 70 },
+          { week: "Fri", count: 42, heightPct: 56 },
+          { week: "Sat", count: 26, heightPct: 35 },
+          { week: "Sun", count: 14, heightPct: 20 },
         ],
-        note: "Peak circulation observed in Week 3 aligned with Midterm project deadlines.",
-      },
+        note: "Peak mid-week borrowing observed on Wednesday before lab submissions.",
+      };
+    } else if (periodParam === "semester") {
+      period = "Semester 2 (2026)";
+      circulatedVolumes = 5620;
+      growthVsAug = "+18.5% YoY Term";
+      regularLoans = 4420;
+      courseReserves = 1200;
+      usageTrend = {
+        type: "Monthly Term Progression",
+        weeks: [
+          { week: "Jul", count: 850, heightPct: 48 },
+          { week: "Aug", count: 1120, heightPct: 64 },
+          { week: "Sep", count: 1480, heightPct: 84 },
+          { week: "Oct", count: 1750, heightPct: 100 },
+          { week: "Nov", count: 420, heightPct: 24 },
+        ],
+        note: "Highest circulation surge projected in October during final coursework submissions.",
+      };
+    }
+
+    const bookUsageData = {
+      period,
+      totalBooks: bookCount > 0 ? bookCount : 1248,
+      circulatedVolumes,
+      growthVsAug,
+      regularLoans,
+      courseReserves,
+      topCategories: activeCategories,
+      usageTrend,
     };
 
     res.status(200).json(bookUsageData);
@@ -154,24 +202,43 @@ const getReservationAnalytics = async (req, res) => {
     ]);
 
     const total = bookResCount + seatResCount;
+    const confirmedTotal = confirmedCount > 0 ? confirmedCount : 284;
+    const cancelledTotal = cancelledCount > 0 ? cancelledCount : 42;
+    const totalCount = total > 0 ? total : 326;
+    const confirmedPct = Math.round((confirmedTotal / (totalCount || 1)) * 100) || 87;
+    const cancelledPct = 100 - confirmedPct;
 
     const reservationData = {
-      period: "Sep 2026",
-      totalReservations: total > 0 ? total : 326,
+      period: "September 2026",
+      totalBookings: totalCount,
+      subTitle: "Total reservations requested",
       growthVsAug: "+14.2% from August",
-      confirmedReservations: confirmedCount > 0 ? confirmedCount : 284,
-      cancelledReservations: cancelledCount > 0 ? cancelledCount : 42,
+      capacityStatus: "100% capacity cap active",
+      statusBreakdown: {
+        fulfillmentRate: `${confirmedPct}% Fulfillment Rate`,
+        confirmed: confirmedTotal,
+        confirmedPct: confirmedPct,
+        cancelled: cancelledTotal,
+        cancelledPct: cancelledPct,
+      },
       weeklyDistribution: [
-        { day: "Mon", count: 42, heightPct: 60 },
-        { day: "Tue", count: 68, heightPct: 90 },
-        { day: "Wed", count: 74, heightPct: 98 },
-        { day: "Thu", count: 58, heightPct: 75 },
-        { day: "Fri", count: 48, heightPct: 65 },
-        { day: "Sat", count: 24, heightPct: 35 },
-        { day: "Sun", count: 12, heightPct: 18 },
+        { week: "W1", confirmed: 72, cancelled: 10, confHeight: 72, cancHeight: 18 },
+        { week: "W2", confirmed: 82, cancelled: 12, confHeight: 82, cancHeight: 22 },
+        { week: "W3", confirmed: 96, cancelled: 14, confHeight: 96, cancHeight: 25 },
+        { week: "W4", confirmed: 74, cancelled: 8, confHeight: 74, cancHeight: 16 },
       ],
-      avgLeadTime: "4.2 hrs",
-      peakDays: "Mon - Wed",
+      weeklyHighlights: {
+        peak: "Peak: Week 3 (96 total)",
+        dailyAvg: "24.2 / day avg",
+      },
+      leadTime: {
+        value: "4.2 hrs",
+        label: "Average reservation advance",
+      },
+      peakDays: {
+        value: "Mon – Wed",
+        label: "62% of weekly check-ins",
+      },
     };
 
     res.status(200).json(reservationData);
@@ -250,34 +317,79 @@ const getSeatOccupancyReport = async (req, res) => {
  * Consolidated Management Reports
  * GET /api/management/reports
  */
+let cachedReports = [
+  {
+    id: "rep-book-usage",
+    title: "Book Usage Report",
+    type: "book-usage",
+    period: "September 2026",
+    updatedDate: "20 Sep 2026",
+    fileSize: "1.4 MB",
+    status: "Audited & Verified",
+    description: "Monthly circulation, category breakdown, and shelf checkout frequencies across all university faculties.",
+    audited: true,
+    summary: "During September 2026, total book checkouts reached 1,248 volumes, representing a +12.4% increase over August. Peak volumes concentrated in Computer Science (Database Systems & Programming Languages). Shelf replenishment turnaround averaged 4.2 hours.",
+    keyMetrics: [
+      { label: "Total Checkouts", value: "1,248 vol" },
+      { label: "Course Reserves", value: "236 vol" },
+      { label: "Active Loans", value: "1,012 vol" },
+      { label: "Overdue Rate", value: "3.2%" }
+    ],
+    signOff: "Prof. Asanka Wijesinghe (Chief Librarian)",
+    certId: "CERT-LIB-2026-09A",
+  },
+  {
+    id: "rep-reservations",
+    title: "Reservation Report",
+    type: "reservation",
+    period: "September 2026",
+    updatedDate: "20 Sep 2026",
+    fileSize: "850 KB",
+    status: "Audited & Verified",
+    description: "Hold queues, confirmation ratios, student pickups, and cancellation logs.",
+    audited: true,
+    summary: "326 advance reservations were requested across books and study desks. 284 were successfully fulfilled and checked in (87.1% fulfillment rate). 42 reservations were cancelled or marked no-show, freeing spaces promptly for waitlisted students.",
+    keyMetrics: [
+      { label: "Fulfillment Rate", value: "87.1%" },
+      { label: "Confirmed Bookings", value: "284" },
+      { label: "Cancelled / No-shows", value: "42" },
+      { label: "Avg Advance Time", value: "4.2 hrs" }
+    ],
+    signOff: "Mrs. A.W. Chamodya (Assistant Librarian)",
+    certId: "CERT-LIB-2026-09B",
+  },
+  {
+    id: "rep-seat-occupancy",
+    title: "Seat Occupancy Report",
+    type: "seat-occupancy",
+    period: "September 2026",
+    updatedDate: "20 Sep 2026",
+    fileSize: "1.1 MB",
+    status: "Audited & Verified",
+    description: "Reading Room A & B hourly density, peak utilization, and desk turn rates.",
+    audited: true,
+    summary: "Reading Room A (Quiet Zone) sustained an average 84% occupancy, with peak intervals occurring between 11:00 AM and 03:00 PM. Reading Room B (Collaborative) operated at 71% average density. Advanced desk reservations eliminated entrance queuing conflicts.",
+    keyMetrics: [
+      { label: "Peak Density", value: "92%" },
+      { label: "Active Desks", value: "39 / 50" },
+      { label: "Room A Avg", value: "84%" },
+      { label: "Room B Avg", value: "71%" }
+    ],
+    signOff: "Senate Library Sub-Committee",
+    certId: "CERT-LIB-2026-09C",
+  },
+];
+
+/**
+ * Consolidated Management Reports
+ * GET /api/management/reports
+ */
 const getManagementReports = async (req, res) => {
   try {
     const reportsData = {
       period: "September 2026",
       generatedAt: new Date().toISOString(),
-      reports: [
-        {
-          id: "rep-book-usage",
-          title: "Book Usage Report",
-          updated: "Updated 20 Sep 2026",
-          format: "PDF • 1.4 MB",
-          status: "Ready to download",
-        },
-        {
-          id: "rep-reservations",
-          title: "Reservation Report",
-          updated: "Updated 20 Sep 2026",
-          format: "PDF • 850 KB",
-          status: "Ready to download",
-        },
-        {
-          id: "rep-seat-occupancy",
-          title: "Seat Occupancy Report",
-          updated: "Updated 20 Sep 2026",
-          format: "PDF • 1.1 MB",
-          status: "Ready to download",
-        },
-      ],
+      reports: cachedReports,
     };
 
     res.status(200).json(reportsData);
@@ -286,6 +398,94 @@ const getManagementReports = async (req, res) => {
       message: "Failed to load management reports",
       error: error.message,
     });
+  }
+};
+
+/**
+ * Create Management Report (CRUD Create)
+ * POST /api/management/reports
+ */
+const createManagementReport = async (req, res) => {
+  try {
+    const { title, description, period } = req.body;
+    if (!title) {
+      return res.status(400).json({ message: "Report title is required." });
+    }
+
+    const newReport = {
+      id: `rep-${Date.now()}`,
+      title: title.trim(),
+      type: "custom",
+      period: period || "September 2026",
+      updatedDate: "Today",
+      fileSize: "1.2 MB",
+      status: "Ready to review",
+      description: description || "Executive management evaluation and internal audit report.",
+      audited: false,
+      summary: `Internal university audit report compiled for ${title}. Initial data collected across active catalog databases and operational logs.`,
+      keyMetrics: [
+        { label: "Dataset Scope", value: "University Wide" },
+        { label: "Audit Status", value: "Pending Review" },
+        { label: "Integrity Verification", value: "100% Passed" },
+      ],
+      signOff: "Library Executive Council",
+      certId: `CERT-GEN-${Date.now().toString().slice(-4)}`,
+    };
+
+    cachedReports.unshift(newReport);
+    res.status(201).json({ message: "Report generated successfully", report: newReport });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to create report", error: error.message });
+  }
+};
+
+/**
+ * Update Management Report Status (CRUD Update)
+ * PUT /api/management/reports/:id
+ */
+const updateManagementReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const reportIndex = cachedReports.findIndex((r) => r.id === id);
+
+    if (reportIndex === -1) {
+      return res.status(404).json({ message: "Report not found." });
+    }
+
+    cachedReports[reportIndex] = {
+      ...cachedReports[reportIndex],
+      status: status || cachedReports[reportIndex].status,
+      audited: status === "Audited & Verified",
+      updatedDate: "Today",
+    };
+
+    res.status(200).json({
+      message: "Report updated successfully",
+      report: cachedReports[reportIndex],
+    });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to update report", error: error.message });
+  }
+};
+
+/**
+ * Delete Management Report (CRUD Delete)
+ * DELETE /api/management/reports/:id
+ */
+const deleteManagementReport = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const initialLen = cachedReports.length;
+    cachedReports = cachedReports.filter((r) => r.id !== id);
+
+    if (cachedReports.length === initialLen) {
+      return res.status(404).json({ message: "Report not found." });
+    }
+
+    res.status(200).json({ message: "Report deleted successfully" });
+  } catch (error) {
+    res.status(500).json({ message: "Failed to delete report", error: error.message });
   }
 };
 
@@ -421,6 +621,9 @@ module.exports = {
   getReservationAnalytics,
   getSeatOccupancyReport,
   getManagementReports,
+  createManagementReport,
+  updateManagementReport,
+  deleteManagementReport,
   listLibraryStaff,
   createLibraryStaff,
   setLibraryStaffStatus,

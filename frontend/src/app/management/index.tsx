@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   ImageBackground,
   KeyboardAvoidingView,
   Platform,
@@ -76,65 +77,86 @@ export default function ManagementLoginScreen() {
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Pressable onPress={() => router.replace('/portal')} accessibilityRole="button" accessibilityLabel="Back to Role Selection" className="px-6 pt-6">
-            <Text className="text-sm font-semibold text-blue-950">Back to Role Selection</Text>
-          </Pressable>
-          {/* Top Header Section */}
-          <View className="px-6 pt-12">
+          {/* Top Header Navigation */}
+          <View className="px-6 pt-12 flex-row items-center justify-between">
             <Pressable
-              onPress={() => router.replace('/(tabs)' as any)}
-              className="flex-row items-center mb-2 active:opacity-70 self-start"
+              onPress={() => router.replace('/portal')}
+              className="flex-row items-center py-1 px-2.5 rounded-full bg-slate-100 active:opacity-70"
+              accessibilityRole="button"
+              accessibilityLabel="Back to Role Selection"
             >
-              <Ionicons name="arrow-back" size={20} color="#1E3A8A" />
-              <Text className="ml-1 text-sm font-semibold text-blue-900">Portal Home</Text>
+              <Ionicons name="arrow-back" size={16} color="#1E3A8A" />
+              <Text className="ml-1.5 text-xs font-semibold text-blue-900">Portal Gateways</Text>
             </Pressable>
+
+            <View className="flex-row items-center rounded-full bg-blue-50 px-3 py-1 border border-blue-200">
+              <View className="h-2 w-2 rounded-full bg-emerald-500 mr-1.5" />
+              <Text className="text-[10px] font-bold tracking-wider text-blue-900">SYSTEM SECURE</Text>
+            </View>
           </View>
-          <View className="items-center px-6 pt-2">
-            {/* Institution Round Icon with small badge */}
+
+          <View className="items-center px-6 pt-3">
+            {/* Institution Round Icon with badge */}
             <View className="relative">
-              <View className="h-16 w-16 items-center justify-center rounded-full bg-blue-100">
-                <Ionicons name="business" size={32} color="#1E3A8A" />
+              <View className="h-16 w-16 items-center justify-center rounded-2xl bg-blue-900 shadow-md">
+                <Ionicons name="library" size={32} color="#FFFFFF" />
               </View>
-              <View className="absolute bottom-0 right-0 h-5 w-5 items-center justify-center rounded-full border-2 border-white bg-blue-900">
-                <Ionicons name="key" size={10} color="#FFFFFF" />
+              <View className="absolute -bottom-1 -right-1 h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-amber-500 shadow-sm">
+                <Ionicons name="shield-checkmark" size={12} color="#FFFFFF" />
               </View>
             </View>
 
             {/* Pill Badge */}
-            <View className="mt-4 flex-row items-center rounded-full bg-blue-50 px-4 py-1.5">
-              <View className="mr-2 h-2 w-2 rounded-full bg-blue-700" />
-              <Text className="text-[10px] font-bold tracking-wider text-blue-900">
-                LIBRARY MANAGEMENT • UNIVERSITY ACCESS
+            <View className="mt-3 flex-row items-center rounded-full bg-blue-50 px-3.5 py-1 border border-blue-100">
+              <Ionicons name="business" size={12} color="#1E3A8A" />
+              <Text className="ml-1.5 text-[10px] font-bold tracking-wider text-blue-950 uppercase">
+                UNIVERSITY LIBRARY GOVERNANCE
               </Text>
             </View>
 
             {/* Title & Subtitle */}
-            <Text className="mt-3 text-2xl font-bold tracking-tight text-slate-900">
+            <Text className="mt-2 text-2xl font-black tracking-tight text-slate-900">
               Management Login
             </Text>
-            <Text className="mt-1 text-xs text-slate-500">
-              Library Reports & Analytics
+            <Text className="mt-0.5 text-xs font-medium text-slate-500">
+              Executive Analytics & Institutional Audit Portal
             </Text>
 
-            {/* Restricted Banner with Library Background Image */}
-            <View className="mt-5 w-full overflow-hidden rounded-2xl bg-blue-950 shadow-md">
-              <ImageBackground
-                source={{
-                  uri: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=800&q=80',
-                }}
-                className="w-full px-5 py-6"
-                imageStyle={{ opacity: 0.22 }}
-              >
-                <View className="flex-row items-center">
-                  <Ionicons name="shield-checkmark" size={18} color="#93C5FD" />
-                  <Text className="ml-2 text-xs font-bold uppercase tracking-wider text-white">
-                    RESTRICTED EXECUTIVE PORTAL
+            {/* Prominent High-Visibility Executive Hero Banner */}
+            <View className="mt-4 w-full overflow-hidden rounded-2xl bg-slate-100 shadow-md border border-slate-200">
+              <View className="relative h-48 w-full">
+                <Image
+                  source={{
+                    uri: 'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1200&q=85',
+                  }}
+                  className="h-full w-full"
+                  resizeMode="cover"
+                />
+
+                {/* Floating Top Badges - Image remains 100% bright and visible */}
+                <View className="absolute top-3 left-3 right-3 flex-row items-center justify-between">
+                  <View className="flex-row items-center rounded-full bg-slate-900/80 px-3 py-1 border border-white/30 shadow-md">
+                    <Ionicons name="key" size={12} color="#93C5FD" />
+                    <Text className="ml-1.5 text-[9px] font-bold uppercase tracking-wider text-white">
+                      EXECUTIVE ACCESS
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center rounded-full bg-emerald-950/85 px-2.5 py-1 border border-emerald-400/40 shadow-md">
+                    <View className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1.5" />
+                    <Text className="text-[9px] font-bold text-emerald-200">LIVE SYNC</Text>
+                  </View>
+                </View>
+
+                {/* Bottom Translucent Info Strip - Keeps photo completely clear above */}
+                <View className="absolute bottom-0 left-0 right-0 bg-slate-950/85 px-4 py-2.5 border-t border-white/15">
+                  <Text className="text-sm font-bold text-white tracking-wide">
+                    Executive Central Administration
+                  </Text>
+                  <Text className="mt-0.5 text-[10px] text-slate-300 font-medium leading-4">
+                    Direct telemetry indices, catalog circulation and reading-hall governance.
                   </Text>
                 </View>
-                <Text className="mt-1 text-[11px] leading-4 text-blue-100">
-                  Authorized personnel access for live usage indices & archival governance
-                </Text>
-              </ImageBackground>
+              </View>
             </View>
           </View>
 
@@ -238,10 +260,28 @@ export default function ManagementLoginScreen() {
               )}
             </Pressable>
 
+            {/* Quick Demo Credentials Pill */}
+            <Pressable
+              onPress={() => {
+                setInstitutionalId('MGT001');
+                setPassword('Admin@123');
+                setError('');
+              }}
+              className="mt-3.5 flex-row items-center justify-between rounded-xl bg-blue-50 px-3.5 py-2.5 border border-blue-200 active:opacity-70"
+            >
+              <View className="flex-row items-center">
+                <Ionicons name="sparkles" size={14} color="#1E3A8A" />
+                <Text className="ml-2 text-xs font-semibold text-blue-950">
+                  Demo Account: <Text className="font-bold">MGT001</Text>
+                </Text>
+              </View>
+              <Text className="text-xs font-bold text-blue-700">Tap to Auto-fill</Text>
+            </Pressable>
+
             {/* Information Card */}
-            <View className="mt-6 flex-row items-start rounded-2xl bg-blue-50/60 p-4">
+            <View className="mt-4 flex-row items-start rounded-2xl bg-slate-50 p-4 border border-slate-200">
               <Ionicons name="school" size={20} color="#1E3A8A" />
-              <Text className="ml-3 flex-1 text-[11px] leading-5 text-slate-600">
+              <Text className="ml-3 flex-1 text-xs leading-5 text-slate-600">
                 Use your central university library management credentials to proceed to daily analytics and occupancy metrics. Management accounts are issued by the University - there is no public sign-up for this portal.
               </Text>
             </View>
@@ -249,12 +289,12 @@ export default function ManagementLoginScreen() {
             {/* SSL Footer Notice */}
             <View className="mt-6 items-center">
               <View className="flex-row items-center">
-                <Ionicons name="lock-closed" size={12} color="#94A3B8" />
-                <Text className="ml-1 text-[10px] text-slate-500">
+                <Ionicons name="lock-closed" size={13} color="#94A3B8" />
+                <Text className="ml-1 text-xs text-slate-500">
                   Strict SSL / TLS 1.3 Encryption
                 </Text>
               </View>
-              <Text className="mt-0.5 text-[9px] text-slate-400">
+              <Text className="mt-0.5 text-[11px] text-slate-500">
                 Institutional Library Services Network
               </Text>
             </View>

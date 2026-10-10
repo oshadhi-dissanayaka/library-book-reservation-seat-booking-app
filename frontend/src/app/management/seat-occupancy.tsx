@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 import { ManagementBottomBar } from '@/components/management-bottom-bar';
+import { ManagementHeader } from '@/components/management-header';
 import { API_BASE_URL } from '@/constants/api';
 
 type SeatOccupancyData = {
@@ -51,7 +52,7 @@ export default function SeatOccupancyScreen() {
       if (!response.ok) throw new Error('Network error');
       const result = await response.json();
       setData(result);
-    } catch (err) {
+    } catch (_err) {
       // Fallback matching Figma specs
       setData({
         period: 'September 2026',
@@ -111,7 +112,8 @@ export default function SeatOccupancyScreen() {
   }, []);
 
   useEffect(() => {
-    loadData();
+    const timer = setTimeout(() => void loadData(), 0);
+    return () => clearTimeout(timer);
   }, [loadData]);
 
   const handleExportDeskLog = () => {
@@ -122,8 +124,23 @@ export default function SeatOccupancyScreen() {
     );
   };
 
+  if (loading && !data) {
+    return (
+      <View className="flex-1 items-center justify-center bg-slate-50">
+        <ActivityIndicator size="large" color="#1E3A8A" />
+      </View>
+    );
+  }
+
   return (
     <View className="flex-1 bg-slate-50">
+      <ManagementHeader
+        title="Management"
+        subtitle="Study Space Utilization"
+        showBackButton={true}
+        badgeLabel="SEATS"
+      />
+
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 95 }}
@@ -132,97 +149,77 @@ export default function SeatOccupancyScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Bar */}
-        <View className="flex-row items-center justify-between bg-white px-5 pb-3 pt-14 border-b border-slate-100">
-          <View className="flex-row items-center">
-            <Pressable onPress={() => router.back()} className="mr-3 p-1">
-              <Ionicons name="arrow-back" size={20} color="#0F172A" />
-            </Pressable>
-            <View>
-              <Text className="text-sm font-bold text-slate-900 leading-tight">
-                Management
-              </Text>
-              <Text className="text-[10px] text-slate-500">
-                Library Reports & Analytics
-              </Text>
-            </View>
-          </View>
-          <View className="h-8 w-8 items-center justify-center rounded-full bg-blue-950">
-            <Ionicons name="person" size={15} color="#FFFFFF" />
-          </View>
-        </View>
-
         <View className="px-4 pt-4">
           {/* Breadcrumb & Period */}
           <View className="flex-row items-end justify-between">
             <View>
-              <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+              <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 LIBRARY MANAGEMENT • STUDY SPACE UTILIZATION
               </Text>
-              <Text className="mt-0.5 text-xl font-bold text-slate-900">
+              <Text className="mt-0.5 text-2xl font-black text-slate-900">
                 Seat Occupancy
               </Text>
             </View>
 
-            <View className="flex-row items-center rounded-xl bg-blue-50 px-2.5 py-1">
-              <Ionicons name="calendar-outline" size={12} color="#1E3A8A" />
-              <Text className="ml-1 text-[10px] font-bold text-blue-950">
+            <View className="flex-row items-center rounded-xl bg-blue-50 px-3 py-1.5 border border-blue-200">
+              <Ionicons name="calendar-outline" size={13} color="#1E3A8A" />
+              <Text className="ml-1.5 text-xs font-bold text-blue-950">
                 September 2026
               </Text>
-              <Ionicons name="chevron-down" size={12} color="#1E3A8A" style={{ marginLeft: 3 }} />
+              <Ionicons name="chevron-down" size={13} color="#1E3A8A" style={{ marginLeft: 3 }} />
             </View>
           </View>
 
           {/* Reading Room Hub Card with thumbnail */}
-          <View className="mt-3.5 flex-row items-center rounded-2xl bg-white p-3 shadow-sm border border-slate-100">
+          <View className="mt-3.5 flex-row items-center rounded-2xl bg-white p-3.5 shadow-sm border border-slate-100">
             <Image
               source={{
                 uri: 'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=200&q=80',
               }}
-              className="h-12 w-12 rounded-xl"
+              className="h-14 w-14 rounded-xl"
             />
             <View className="ml-3 flex-1">
-              <Text className="text-[9px] font-bold uppercase tracking-wider text-blue-800">
+              <Text className="text-xs font-bold uppercase tracking-wider text-blue-800">
                 {data?.campusHub || 'CAMPUS CENTRAL HUB'}
               </Text>
-              <Text className="text-xs font-bold text-slate-900">
+              <Text className="text-sm font-bold text-slate-900 mt-0.5">
                 {data?.hallName || 'Main Reading Rooms (A & B)'}
               </Text>
-              <Text className="text-[10px] text-slate-400">
+              <Text className="text-xs text-slate-500 font-medium mt-0.5">
                 {data?.totalCatalogedDesks || 50} total cataloged study stations
               </Text>
             </View>
-            <View className="h-7 w-7 items-center justify-center rounded-lg bg-blue-50">
-              <Ionicons name="business-outline" size={15} color="#1E3A8A" />
+            <View className="h-8 w-8 items-center justify-center rounded-xl bg-blue-50">
+              <Ionicons name="business-outline" size={17} color="#1E3A8A" />
             </View>
           </View>
 
           {/* Card: Overall Occupancy */}
-          <View className="mt-3 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+          <View className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <View className="mr-2 h-2 w-2 rounded-full bg-blue-950" />
-                <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-500">
+                <View className="mr-2 h-2.5 w-2.5 rounded-full bg-blue-950" />
+                <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
                   OVERALL OCCUPANCY
                 </Text>
               </View>
-              <View className="rounded-full bg-blue-50 px-2 py-0.5">
-                <Text className="text-[10px] font-semibold text-blue-900">
+              <View className="rounded-full bg-blue-50 px-2.5 py-0.5 border border-blue-200">
+                <Text className="text-xs font-bold text-blue-950">
                   {data?.statusLabel || 'Steady Usage'}
                 </Text>
               </View>
             </View>
 
             <View className="mt-2.5 flex-row items-baseline">
-              <Text className="text-3xl font-bold tracking-tight text-blue-950">
+              <Text className="text-3xl font-black tracking-tight text-blue-950">
                 {data?.overallOccupancy || 78}%
               </Text>
-              <Text className="ml-2 text-xs text-slate-500">
+              <Text className="ml-2 text-xs font-medium text-slate-500">
                 Average daily reading room occupancy
               </Text>
             </View>
 
-            <View className="mt-3 h-2 w-full overflow-hidden rounded-full bg-blue-50">
+            <View className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-blue-50">
               <View
                 className="h-full rounded-full bg-blue-950"
                 style={{ width: `${data?.overallOccupancy || 78}%` }}
@@ -230,67 +227,70 @@ export default function SeatOccupancyScreen() {
             </View>
 
             <View className="mt-2 flex-row justify-between">
-              <Text className="text-[10px] text-slate-400">
+              <Text className="text-xs font-medium text-slate-500">
                 Capacity benchmark: {data?.capacityBenchmark || 50} desks
               </Text>
-              <Text className="text-[10px] font-medium text-slate-600">
+              <Text className="text-xs font-bold text-slate-700">
                 {data?.averageInUse || 39} average in use
               </Text>
             </View>
           </View>
 
           {/* Section: Room Allocation Breakdown */}
-          <View className="mt-3.5 flex-row items-center justify-between">
-            <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+          <View className="mt-4 flex-row items-center justify-between">
+            <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
               ROOM ALLOCATION BREAKDOWN
             </Text>
-            <Text className="text-[10px] font-bold text-blue-900">
+            <Text className="text-xs font-bold text-blue-900">
               2 Active Halls
             </Text>
           </View>
 
           {/* Room Cards */}
-          {data?.rooms.map((room) => (
+          {data?.rooms?.map((room) => (
             <View
               key={room.id}
-              className="mt-2 rounded-2xl bg-white p-4 shadow-sm border border-slate-100"
+              className="mt-2.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100"
             >
               <View className="flex-row items-center justify-between">
                 <View className="flex-row items-center">
-                  <Text className="text-xs font-bold text-slate-900">
+                  <Text className="text-sm font-bold text-slate-900">
                     {room.name}
                   </Text>
-                  <View className="ml-2 rounded-full bg-blue-50 px-2 py-0.5">
-                    <Text className="text-[9px] font-semibold text-blue-800">
+                  <View className="ml-2 rounded-full bg-blue-50 px-2.5 py-0.5 border border-blue-200">
+                    <Text className="text-xs font-bold text-blue-800">
                       {room.type}
                     </Text>
                   </View>
                 </View>
-                <Text className="text-base font-bold text-blue-950">
+                <Text className="text-lg font-black text-blue-950">
                   {room.occupancy}%
                 </Text>
               </View>
 
               <View className="flex-row justify-between items-center mt-0.5">
-                <Text className="text-[10px] text-slate-400">{room.wing}</Text>
-                <Text className="text-[9px] text-slate-400">occupied</Text>
+                <Text className="text-xs text-slate-500 font-medium">{room.wing}</Text>
+                <Text className="text-xs text-slate-400">occupied</Text>
               </View>
 
-              <View className="mt-2.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+              <View className="mt-2.5 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
                 <View
-                  className="h-full rounded-full bg-blue-950"
-                  style={{ width: `${room.occupancy}%` }}
+                  className="h-full rounded-full"
+                  style={{
+                    width: `${room.occupancy}%`,
+                    backgroundColor: room.occupancy >= 80 ? '#2563EB' : '#10B981',
+                  }}
                 />
               </View>
 
-              <View className="mt-2 flex-row items-center justify-between">
+              <View className="mt-2.5 flex-row items-center justify-between">
                 <View className="flex-row items-center">
-                  <Ionicons name="desktop-outline" size={13} color="#64748B" />
-                  <Text className="ml-1 text-[10px] text-slate-600">
+                  <Ionicons name="desktop-outline" size={14} color="#64748B" />
+                  <Text className="ml-1.5 text-xs text-slate-700 font-medium">
                     {room.utilized} of {room.total} desks utilized
                   </Text>
                 </View>
-                <Text className="text-[10px] font-bold text-slate-800">
+                <Text className="text-xs font-bold text-emerald-800">
                   {room.remaining} remaining
                 </Text>
               </View>
@@ -298,37 +298,38 @@ export default function SeatOccupancyScreen() {
           ))}
 
           {/* Card: Hourly Occupancy Trend */}
-          <View className="mt-3 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+          <View className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
             <View className="flex-row items-center justify-between">
               <View>
-                <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+                <Text className="text-xs font-bold uppercase tracking-wider text-slate-400">
                   OCCUPANCY TREND
                 </Text>
-                <Text className="mt-0.5 text-xs font-bold text-slate-900">
+                <Text className="mt-0.5 text-sm font-bold text-slate-900">
                   Hourly Distribution (08:00 – 20:00)
                 </Text>
               </View>
-              <View className="h-6 w-6 items-center justify-center rounded-lg bg-blue-50">
-                <Ionicons name="pulse" size={14} color="#1E3A8A" />
+              <View className="h-7 w-7 items-center justify-center rounded-lg bg-blue-100">
+                <Ionicons name="pulse" size={16} color="#1E3A8A" />
               </View>
             </View>
 
-            {/* Dense 13 Hour Bars */}
-            <View className="mt-5 flex-row items-end justify-between">
-              {data?.hourlyDistribution.map((item) => (
+            {/* Dense 13 Hour Bars with Vibrant High-Contrast Visuals */}
+            <View className="mt-6 flex-row items-end justify-between px-1">
+              {data?.hourlyDistribution?.map((item) => (
                 <View key={item.hour} className="items-center flex-1">
                   {item.peak && (
-                    <Text className="mb-0.5 text-[7px] font-bold text-blue-950">
+                    <Text className="mb-0.5 text-[9px] font-black text-blue-950">
                       {item.pct}%
                     </Text>
                   )}
                   <View
-                    className={`w-3.5 rounded-t-sm ${
-                      item.peak ? 'bg-blue-950' : 'bg-blue-100'
-                    }`}
-                    style={{ height: item.pct * 0.7 }}
+                    className="w-3.5 rounded-t-sm shadow-sm"
+                    style={{
+                      height: Math.max(10, item.pct * 0.75),
+                      backgroundColor: item.peak ? '#2563EB' : '#93C5FD',
+                    }}
                   />
-                  <Text className="mt-1 text-[8px] text-slate-400">
+                  <Text className={`mt-1.5 text-[10px] ${item.peak ? 'font-bold text-blue-950' : 'text-slate-500 font-medium'}`}>
                     {item.hour}
                   </Text>
                 </View>
@@ -336,47 +337,47 @@ export default function SeatOccupancyScreen() {
             </View>
 
             {/* Maximum Utilization Highlight */}
-            <View className="mt-4 flex-row items-center justify-between rounded-xl bg-blue-50/80 p-3">
-              <View className="flex-row items-center flex-1">
-                <View className="h-8 w-8 items-center justify-center rounded-full bg-blue-950 mr-2.5">
-                  <Ionicons name="time" size={15} color="#FFFFFF" />
+            <View className="mt-5 flex-row items-center justify-between rounded-xl bg-blue-50/80 p-3.5 border border-blue-100">
+              <View className="flex-row items-center flex-1 mr-2">
+                <View className="h-9 w-9 items-center justify-center rounded-full bg-blue-950 mr-2.5">
+                  <Ionicons name="time" size={17} color="#FFFFFF" />
                 </View>
-                <View>
-                  <Text className="text-[8px] font-bold uppercase tracking-wider text-blue-900">
+                <View className="flex-1">
+                  <Text className="text-xs font-bold uppercase tracking-wider text-blue-900">
                     MAXIMUM UTILIZATION
                   </Text>
-                  <Text className="text-xs font-bold text-slate-900">
-                    Peak Period: {data?.peakUtilization.period || '11:00 AM – 03:00 PM'}
+                  <Text className="text-sm font-bold text-slate-900 mt-0.5">
+                   Peak Period: {data?.peakUtilization?.period || '11:00 AM – 03:00 PM'}
                   </Text>
                 </View>
               </View>
               <View className="items-end">
-                <Text className="text-sm font-bold text-blue-950">
-                  {data?.peakUtilization.peakCap || '92%'}
+                <Text className="text-lg font-black text-blue-950">
+                  {data?.peakUtilization?.peakCap || '92%'}
                 </Text>
-                <Text className="text-[9px] text-slate-400">Peak Cap</Text>
+                <Text className="text-xs font-medium text-slate-500">Peak Cap</Text>
               </View>
             </View>
 
             {/* Monthly Desk Log Report Action Banner */}
-            <View className="mt-3.5 flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-3">
+            <View className="mt-3.5 flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50/70 p-3.5">
               <View className="flex-row items-center flex-1 mr-2">
-                <Ionicons name="calendar-outline" size={16} color="#1E3A8A" />
-                <View className="ml-2">
-                  <Text className="text-xs font-bold text-slate-900">
+                <Ionicons name="calendar-outline" size={18} color="#1E3A8A" />
+                <View className="ml-2.5 flex-1">
+                  <Text className="text-sm font-bold text-slate-900">
                     Monthly Desk Log Report
                   </Text>
-                  <Text className="text-[9px] text-slate-500">
+                  <Text className="text-xs text-slate-500 mt-0.5">
                     Generated automatically for Senate Library Board
                   </Text>
                 </View>
               </View>
               <Pressable
                 onPress={handleExportDeskLog}
-                className="flex-row items-center rounded-xl bg-blue-950 px-3 py-1.5 active:opacity-90"
+                className="flex-row items-center rounded-xl bg-blue-950 px-3.5 py-2 active:opacity-90"
               >
-                <Text className="text-[11px] font-bold text-white mr-1">Export</Text>
-                <Ionicons name="download-outline" size={13} color="#FFFFFF" />
+                <Text className="text-xs font-bold text-white mr-1.5">Export</Text>
+                <Ionicons name="download-outline" size={14} color="#FFFFFF" />
               </Pressable>
             </View>
           </View>

@@ -47,13 +47,7 @@ export function ManagementBottomBar({ currentTab }: ManagementBottomBarProps) {
       iconActive: 'desktop',
       iconInactive: 'desktop-outline',
     },
-    {
-      id: 'staff',
-      label: 'Staff',
-      route: '/management/staff-accounts',
-      iconActive: 'people',
-      iconInactive: 'people-outline',
-    },
+    
   ];
 
   return (

@@ -1,4 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { router } from 'expo-router';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -13,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { ManagementBottomBar } from '@/components/management-bottom-bar';
+import { ManagementHeader } from '@/components/management-header';
 import { API_BASE_URL } from '@/constants/api';
 
 type ReportItem = {
@@ -25,6 +28,10 @@ type ReportItem = {
   status: string;
   description: string;
   audited: boolean;
+  summary?: string;
+  keyMetrics?: { label: string; value: string }[];
+  signOff?: string;
+  certId?: string;
 };
 
 export default function ManagementReportsScreen() {
@@ -39,6 +46,11 @@ export default function ManagementReportsScreen() {
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Document Viewer & Download State
+  const [documentViewerVisible, setDocumentViewerVisible] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadSuccessMessage, setDownloadSuccessMessage] = useState<string | null>(null);
 
   // Fetch reports (CRUD: Read)
   const loadReports = useCallback(async () => {
@@ -60,10 +72,19 @@ export default function ManagementReportsScreen() {
           period: 'September 2026',
           updatedDate: '20 Sep 2026',
           fileSize: '2.4 MB',
-          status: 'Ready to review',
+          status: 'Audited & Verified',
           description:
-            'Monthly circulation, category breakdown, and shelf checkout frequencies.',
+            'Monthly circulation, category breakdown, and shelf checkout frequencies across all faculties.',
           audited: true,
+          summary: 'Total book loans reached 1,248 volumes during September 2026, marking a 12.4% increase over August. Computer Science (Database Systems & Programming) formed 68% of loans, with a 98.4% timely return rate.',
+          keyMetrics: [
+            { label: 'Circulated Volumes', value: '1,248 vol' },
+            { label: 'Regular Loans', value: '1,012 vol' },
+            { label: 'Course Reserves', value: '236 vol' },
+            { label: 'Overdue Rate', value: '1.6%' },
+          ],
+          signOff: 'Prof. Asanka Wijesinghe (Chief Librarian)',
+          certId: 'CERT-LIB-2026-09A',
         },
         {
           id: 'rep-2',
@@ -72,10 +93,19 @@ export default function ManagementReportsScreen() {
           period: 'September 2026',
           updatedDate: '20 Sep 2026',
           fileSize: '1.8 MB',
-          status: 'Select audit',
+          status: 'Audited & Verified',
           description:
-            'Hold queues, confirmation ratios, student pickups, and cancellations.',
+            'Hold queues, confirmation ratios, student pickups, and cancellation logs.',
           audited: true,
+          summary: '326 reservation requests were submitted across catalog books and reading desks. 284 reservations were fulfilled within scheduled pickup windows (87.1% fulfillment rate), while 42 were cancelled.',
+          keyMetrics: [
+            { label: 'Fulfillment Rate', value: '87.1%' },
+            { label: 'Confirmed Bookings', value: '284' },
+            { label: 'Cancelled / Expired', value: '42' },
+            { label: 'Average Lead Time', value: '4.2 hrs' },
+          ],
+          signOff: 'Mrs. A.W. Chamodya (Assistant Librarian)',
+          certId: 'CERT-LIB-2026-09B',
         },
         {
           id: 'rep-3',
@@ -84,10 +114,19 @@ export default function ManagementReportsScreen() {
           period: 'September 2026',
           updatedDate: '20 Sep 2026',
           fileSize: '1.6 MB',
-          status: 'Select audit',
+          status: 'Audited & Verified',
           description:
             'Reading Room A & B hourly density, peak utilization, and desk turn rates.',
           audited: true,
+          summary: 'Overall reading desk occupancy averaged 78% during September. Reading Room A (Quiet Zone) sustained 84% average occupancy with peak usage between 11:00 AM and 03:00 PM. No entrance queuing conflicts were recorded.',
+          keyMetrics: [
+            { label: 'Peak Capacity', value: '92%' },
+            { label: 'Active Desks', value: '39 / 50' },
+            { label: 'Reading Room A', value: '84% avg' },
+            { label: 'Reading Room B', value: '71% avg' },
+          ],
+          signOff: 'Senate Library Facilities Sub-Committee',
+          certId: 'CERT-LIB-2026-09C',
         },
       ]);
     } finally {
@@ -97,7 +136,8 @@ export default function ManagementReportsScreen() {
   }, [selectedReportId]);
 
   useEffect(() => {
-    loadReports();
+    const timer = setTimeout(() => void loadReports(), 0);
+    return () => clearTimeout(timer);
   }, [loadReports]);
 
   // CRUD: Create Report
@@ -197,9 +237,174 @@ export default function ManagementReportsScreen() {
   };
 
   const selectedReport = reports.find((r) => r.id === selectedReportId) || reports[0];
+  const handleSavePdf = async () => {
+  if (!selectedReport) {
+    Alert.alert('Error', 'No report selected.');
+    return;
+  }
+
+  try {
+    setIsDownloading(true);
+
+    const metricsHtml = (selectedReport.keyMetrics || [])
+      .map(
+        (metric) => `
+          <div class="metric">
+            <div class="metric-label">${metric.label}</div>
+            <div class="metric-value">${metric.value}</div>
+          </div>
+        `
+      )
+      .join('');
+
+    const html = `
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0">
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 35px;
+              color: #0f172a;
+            }
+
+            .header {
+              text-align: center;
+              border-bottom: 1px solid #cbd5e1;
+              padding-bottom: 20px;
+            }
+
+            h1 {
+              font-size: 22px;
+              margin-bottom: 5px;
+            }
+
+            .sub {
+              color: #64748b;
+              font-size: 13px;
+            }
+
+            .meta {
+              margin-top: 25px;
+              padding: 15px;
+              background: #f8fafc;
+              border-radius: 10px;
+            }
+
+            .title {
+              margin-top: 30px;
+              font-size: 24px;
+              font-weight: bold;
+            }
+
+            .summary {
+              margin-top: 20px;
+              padding: 18px;
+              background: #eff6ff;
+              border-radius: 10px;
+              line-height: 1.6;
+            }
+
+            .metrics {
+              margin-top: 25px;
+            }
+
+            .metric {
+              margin-bottom: 10px;
+              padding: 12px;
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+            }
+
+            .metric-label {
+              color: #64748b;
+              font-size: 12px;
+            }
+
+            .metric-value {
+              font-size: 18px;
+              font-weight: bold;
+              margin-top: 4px;
+            }
+
+            .sign {
+              margin-top: 35px;
+              border-top: 1px solid #cbd5e1;
+              padding-top: 15px;
+            }
+          </style>
+        </head>
+
+        <body>
+          <div class="header">
+            <h1>SRI LANKA INSTITUTE OF INFORMATION TECHNOLOGY</h1>
+            <div class="sub">
+              CENTRAL LIBRARY GOVERNANCE & ARCHIVAL BOARD
+            </div>
+          </div>
+
+          <div class="meta">
+            <strong>Period:</strong> ${selectedReport.period}<br>
+            <strong>Status:</strong> ${selectedReport.status}<br>
+            <strong>Certificate ID:</strong> ${selectedReport.certId || 'N/A'}
+          </div>
+
+          <div class="title">${selectedReport.title}</div>
+
+          <p>${selectedReport.description}</p>
+
+          <div class="summary">
+            <strong>EXECUTIVE SUMMARY & FINDINGS</strong>
+            <p>
+              ${
+                selectedReport.summary ||
+                'Comprehensive library management report.'
+              }
+            </p>
+          </div>
+
+          <div class="metrics">
+            <h3>KEY AUDIT INDICES</h3>
+            ${metricsHtml}
+          </div>
+
+          <div class="sign">
+            <strong>CERTIFIED SIGN-OFF</strong><br><br>
+            ${selectedReport.signOff || 'University Library Management'}
+          </div>
+        </body>
+      </html>
+    `;
+
+    const { uri } = await Print.printToFileAsync({ html });
+
+    if (await Sharing.isAvailableAsync()) {
+      await Sharing.shareAsync(uri, {
+        mimeType: 'application/pdf',
+        dialogTitle: 'Save Library Report',
+        UTI: 'com.adobe.pdf',
+      });
+    } else {
+      Alert.alert('PDF Created', `PDF created at: ${uri}`);
+    }
+  } catch (error) {
+    console.error('PDF generation error:', error);
+    Alert.alert('Error', 'Could not generate the PDF.');
+  } finally {
+    setIsDownloading(false);
+  }
+};
 
   return (
     <View className="flex-1 bg-slate-50">
+      <ManagementHeader
+        title="Management Reports"
+        subtitle="Audit Logs & Compliance Archives"
+        showBackButton={true}
+        badgeLabel="AUDIT"
+      />
+
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 95 }}
@@ -214,54 +419,39 @@ export default function ManagementReportsScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header Bar */}
-        <View className="flex-row items-center justify-between bg-white px-5 pb-3 pt-14 border-b border-slate-100">
-          <View className="flex-row items-center">
-            <Pressable onPress={() => router.back()} className="mr-3 p-1">
-              <Ionicons name="arrow-back" size={20} color="#0F172A" />
-            </Pressable>
-            <Text className="text-base font-bold text-slate-900 leading-tight">
-              Management Reports
-            </Text>
-          </View>
-          <View className="h-8 w-8 items-center justify-center rounded-full bg-blue-950">
-            <Ionicons name="person" size={15} color="#FFFFFF" />
-          </View>
-        </View>
-
         <View className="px-4 pt-4">
           {/* Top Meta info */}
           <View className="flex-row items-center justify-between">
-            <View className="flex-row items-center rounded-full bg-blue-50 px-3 py-1">
-              <Text className="text-[9px] font-bold text-blue-900">
+            <View className="flex-row items-center rounded-full bg-blue-50 px-3.5 py-1.5 border border-blue-200">
+              <Text className="text-xs font-bold text-blue-900">
                 EXECUTIVE ARCHIVE
               </Text>
-              <Text className="mx-1 text-[9px] text-blue-400">•</Text>
-              <Text className="text-[9px] font-medium text-blue-800">
+              <Text className="mx-1.5 text-xs text-blue-400">•</Text>
+              <Text className="text-xs font-semibold text-blue-800">
                 LIBRARY MANAGEMENT
               </Text>
             </View>
             <View className="flex-row items-center">
-              <Ionicons name="code-working" size={12} color="#94A3B8" />
-              <Text className="ml-1 text-[10px] font-medium text-slate-400">
+              <Ionicons name="code-working" size={14} color="#64748B" />
+              <Text className="ml-1 text-xs font-semibold text-slate-500">
                 v2.6
               </Text>
             </View>
           </View>
 
-          <Text className="mt-2 text-xs text-slate-500">
+          <Text className="mt-2 text-sm text-slate-500">
             Library Management Audit & Summaries
           </Text>
 
           {/* Report Period Selector Card */}
           <View className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
             <View className="flex-row items-center justify-between">
-              <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+              <Text className="text-xs font-bold uppercase tracking-wider text-slate-400">
                 REPORT PERIOD
               </Text>
-              <View className="flex-row items-center rounded-full bg-blue-50 px-2 py-0.5">
-                <View className="h-1.5 w-1.5 rounded-full bg-blue-700 mr-1" />
-                <Text className="text-[9px] font-bold text-blue-900">
+              <View className="flex-row items-center rounded-full bg-blue-50 px-2.5 py-0.5 border border-blue-200">
+                <View className="h-2 w-2 rounded-full bg-blue-700 mr-1.5" />
+                <Text className="text-xs font-bold text-blue-900">
                   Active Session
                 </Text>
               </View>
@@ -269,33 +459,33 @@ export default function ManagementReportsScreen() {
 
             <View className="mt-3 flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <View className="h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
-                  <Ionicons name="calendar-outline" size={18} color="#1E3A8A" />
+                <View className="h-10 w-10 items-center justify-center rounded-xl bg-blue-50">
+                  <Ionicons name="calendar-outline" size={20} color="#1E3A8A" />
                 </View>
                 <View className="ml-3">
-                  <Text className="text-sm font-bold text-slate-900">
+                  <Text className="text-base font-bold text-slate-900">
                     {period}
                   </Text>
-                  <Text className="text-[10px] text-slate-400">
+                  <Text className="text-xs text-slate-500">
                     Fall Semester • Cycle M-09
                   </Text>
                 </View>
               </View>
-              <Ionicons name="chevron-down" size={16} color="#64748B" />
+              <Ionicons name="chevron-down" size={18} color="#64748B" />
             </View>
           </View>
 
           {/* Action Row: Generate New Report (CRUD Create) */}
           <View className="mt-4 flex-row items-center justify-between">
-            <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+            <Text className="text-xs font-bold uppercase tracking-wider text-slate-400">
               AVAILABLE AUDIT REPORTS ({reports.length})
             </Text>
             <Pressable
               onPress={() => setCreateModalVisible(true)}
-              className="flex-row items-center rounded-xl bg-blue-50 px-2.5 py-1 active:opacity-80"
+              className="flex-row items-center rounded-xl bg-blue-50 px-3 py-1.5 border border-blue-200 active:opacity-80"
             >
-              <Ionicons name="add-circle" size={14} color="#1E3A8A" />
-              <Text className="ml-1 text-[10px] font-bold text-blue-950">
+              <Ionicons name="add-circle" size={16} color="#1E3A8A" />
+              <Text className="ml-1.5 text-xs font-bold text-blue-950">
                 Generate Report
               </Text>
             </Pressable>
@@ -319,14 +509,14 @@ export default function ManagementReportsScreen() {
                 >
                   <View className="flex-row items-start justify-between">
                     <View className="flex-row items-start flex-1 mr-2">
-                      <View className="h-9 w-9 items-center justify-center rounded-xl bg-blue-950">
-                        <Ionicons name={iconName} size={17} color="#FFFFFF" />
+                      <View className="h-10 w-10 items-center justify-center rounded-xl bg-blue-950">
+                        <Ionicons name={iconName} size={19} color="#FFFFFF" />
                       </View>
                       <View className="ml-3 flex-1">
-                        <Text className="text-xs font-bold text-slate-900">
+                        <Text className="text-sm font-bold text-slate-900">
                           {item.title}
                         </Text>
-                        <Text className="text-[9px] text-slate-400 mt-0.5">
+                        <Text className="text-xs text-slate-500 mt-0.5">
                           Updated {item.updatedDate}
                         </Text>
                       </View>
@@ -348,22 +538,22 @@ export default function ManagementReportsScreen() {
                     </View>
                   </View>
 
-                  <Text className="mt-2.5 text-[11px] leading-4 text-slate-600">
+                  <Text className="mt-2.5 text-xs leading-5 text-slate-600">
                     {item.description}
                   </Text>
 
-                  <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
+                  <View className="mt-3.5 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
                     <View className="flex-row items-center">
-                      <View className="rounded bg-slate-100 px-1.5 py-0.5">
-                        <Text className="text-[8px] font-bold text-slate-600">
+                      <View className="rounded-md bg-slate-100 px-2 py-0.5 border border-slate-200">
+                        <Text className="text-xs font-bold text-slate-600">
                           PDF • {item.fileSize}
                         </Text>
                       </View>
                       <Pressable
                         onPress={() => handleToggleAudit(item)}
-                        className="ml-2"
+                        className="ml-2.5"
                       >
-                        <Text className="text-[10px] font-bold text-blue-900">
+                        <Text className="text-xs font-bold text-blue-900">
                           {item.status} &gt;
                         </Text>
                       </Pressable>
@@ -374,7 +564,7 @@ export default function ManagementReportsScreen() {
                       onPress={() => handleDeleteReport(item.id, item.title)}
                       className="p-1"
                     >
-                      <Ionicons name="trash-outline" size={14} color="#EF4444" />
+                      <Ionicons name="trash-outline" size={16} color="#EF4444" />
                     </Pressable>
                   </View>
                 </Pressable>
@@ -383,49 +573,186 @@ export default function ManagementReportsScreen() {
           </View>
 
           {/* Audited Registry Notice */}
-          <View className="mt-3 flex-row items-center justify-center">
-            <Ionicons name="shield-checkmark" size={14} color="#1E3A8A" />
-            <Text className="ml-1.5 text-[10px] font-medium text-slate-500">
-              Audited & Digitally Certified by Registry
+          <View className="mt-3.5 flex-row items-center justify-center">
+            <Ionicons name="shield-checkmark" size={16} color="#1E3A8A" />
+            <Text className="ml-1.5 text-xs font-semibold text-slate-500">
+              Audited & Digitally Certified by Registry Council
             </Text>
           </View>
 
           {/* Action Buttons: VIEW REPORT & DOWNLOAD REPORT */}
-          <View className="mt-4 space-y-2">
+          <View className="mt-4 space-y-2.5">
             <Pressable
-              onPress={() =>
-                Alert.alert(
-                  selectedReport?.title || 'Report',
-                  `Viewing certified analytics for ${selectedReport?.title || 'Report'}.\nFulfillment status: ${selectedReport?.status}`,
-                  [{ text: 'Close' }]
-                )
-              }
-              className="flex-row items-center justify-center rounded-2xl bg-blue-950 py-3.5 shadow-sm active:opacity-90"
+              onPress={() => setDocumentViewerVisible(true)}
+              className="flex-row items-center justify-center rounded-2xl bg-blue-950 py-4 shadow-sm active:opacity-90"
             >
-              <Ionicons name="eye-outline" size={16} color="#FFFFFF" />
-              <Text className="ml-2 text-xs font-bold tracking-wider text-white">
+              <Ionicons name="document-text" size={18} color="#FFFFFF" />
+              <Text className="ml-2 text-sm font-bold tracking-wider text-white">
                 VIEW REPORT
               </Text>
             </Pressable>
 
             <Pressable
-              onPress={() =>
-                Alert.alert(
-                  'Download Started',
-                  `Downloading ${selectedReport?.title || 'Report'} (${selectedReport?.fileSize || '2 MB'}). Saved to local device downloads.`,
-                  [{ text: 'OK' }]
-                )
-              }
-              className="mt-2.5 flex-row items-center justify-center rounded-2xl bg-blue-100/70 py-3.5 active:opacity-90"
+  onPress={handleSavePdf}
+  disabled={isDownloading}
+              className="mt-2.5 flex-row items-center justify-center rounded-2xl bg-blue-100 py-4 border border-blue-200 active:opacity-90"
             >
-              <Ionicons name="download-outline" size={16} color="#1E3A8A" />
-              <Text className="ml-2 text-xs font-bold tracking-wider text-blue-950">
-                DOWNLOAD REPORT
-              </Text>
+              {isDownloading ? (
+                <ActivityIndicator color="#1E3A8A" size="small" />
+              ) : (
+                <>
+                  <Ionicons name="download" size={18} color="#1E3A8A" />
+                  <Text className="ml-2 text-sm font-bold tracking-wider text-blue-950">
+                    DOWNLOAD REPORT (PDF)
+                  </Text>
+                </>
+              )}
             </Pressable>
           </View>
         </View>
       </ScrollView>
+
+      {/* FULL DOCUMENT VIEWER MODAL */}
+      <Modal
+        visible={documentViewerVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setDocumentViewerVisible(false)}
+      >
+        <View className="flex-1 bg-black/60 justify-end">
+          <View className="h-[90%] rounded-t-3xl bg-white shadow-2xl flex-col">
+            {/* Modal Header */}
+            <View className="flex-row items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50 rounded-t-3xl">
+              <View className="flex-row items-center">
+                <View className="h-8 w-8 items-center justify-center rounded-xl bg-blue-950">
+                  <Ionicons name="document-text" size={16} color="#FFFFFF" />
+                </View>
+                <View className="ml-2.5">
+                  <Text className="text-xs font-bold text-slate-900">Official Document Preview</Text>
+                  <Text className="text-[10px] text-slate-500">{selectedReport?.certId || 'CERT-LIB-2026-09A'}</Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={() => setDocumentViewerVisible(false)}
+                className="h-8 w-8 items-center justify-center rounded-full bg-slate-200 active:opacity-70"
+              >
+                <Ionicons name="close" size={18} color="#0F172A" />
+              </Pressable>
+            </View>
+
+            {/* Document Body (Paper simulation) */}
+            <ScrollView className="flex-1 p-5" showsVerticalScrollIndicator={false}>
+              {/* Institutional Paper Sheet */}
+              <View className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                {/* University Header */}
+                <View className="items-center pb-4 border-b border-slate-200">
+                  <View className="h-12 w-12 items-center justify-center rounded-2xl bg-blue-950 mb-2">
+                    <Ionicons name="library" size={24} color="#FFFFFF" />
+                  </View>
+                  <Text className="text-sm font-black uppercase tracking-wider text-slate-900 text-center">
+                    SRI LANKA INSTITUTE OF INFORMATION TECHNOLOGY
+                  </Text>
+                  <Text className="text-xs font-semibold text-slate-500 uppercase tracking-widest text-center mt-0.5">
+                    CENTRAL LIBRARY GOVERNANCE & ARCHIVAL BOARD
+                  </Text>
+                </View>
+
+                {/* Metadata Row */}
+                <View className="mt-4 flex-row items-center justify-between bg-slate-50 p-3 rounded-xl border border-slate-100">
+                  <View>
+                    <Text className="text-[10px] uppercase font-bold text-slate-400">PERIOD</Text>
+                    <Text className="text-xs font-bold text-slate-800">{selectedReport?.period || period}</Text>
+                  </View>
+                  <View>
+                    <Text className="text-[10px] uppercase font-bold text-slate-400">STATUS</Text>
+                    <Text className="text-xs font-bold text-emerald-700">● {selectedReport?.status || 'Certified'}</Text>
+                  </View>
+                  <View>
+                    <Text className="text-[10px] uppercase font-bold text-slate-400">FILE TYPE</Text>
+                    <Text className="text-xs font-bold text-blue-950">PDF • {selectedReport?.fileSize || '1.4 MB'}</Text>
+                  </View>
+                </View>
+
+                {/* Report Title */}
+                <View className="mt-5">
+                  <Text className="text-lg font-black text-slate-950">
+                    {selectedReport?.title}
+                  </Text>
+                  <Text className="text-xs text-slate-600 mt-1 leading-5">
+                    {selectedReport?.description}
+                  </Text>
+                </View>
+
+                {/* Executive Summary */}
+                <View className="mt-4 rounded-xl bg-blue-50/70 p-4 border border-blue-100">
+                  <Text className="text-xs font-bold uppercase tracking-wider text-blue-950 mb-1.5">
+                    EXECUTIVE SUMMARY & FINDINGS
+                  </Text>
+                  <Text className="text-sm text-slate-700 leading-6">
+                    {selectedReport?.summary ||
+                      'Comprehensive telemetry compilation reflecting student checkouts, room density, and reservation operations during the academic cycle.'}
+                  </Text>
+                </View>
+
+                {/* Key Metrics Grid */}
+                <View className="mt-4">
+                  <Text className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">
+                    KEY AUDIT INDICES
+                  </Text>
+                  <View className="flex-row flex-wrap justify-between">
+                    {(
+                      selectedReport?.keyMetrics || [
+                        { label: 'Circulation Vol', value: '1,248 vol' },
+                        { label: 'Fulfillment Rate', value: '87.1%' },
+                        { label: 'Desk Occupancy', value: '78%' },
+                        { label: 'Audit Integrity', value: '100% OK' },
+                      ]
+                    ).map((m, i) => (
+                      <View key={i} className="w-[48%] bg-slate-50 p-3 rounded-xl border border-slate-100 mb-2">
+                        <Text className="text-xs font-semibold text-slate-500 uppercase">{m.label}</Text>
+                        <Text className="text-base font-black text-blue-950 mt-0.5">{m.value}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {/* Digital Verification & Stamp */}
+                <View className="mt-5 pt-4 border-t border-dashed border-slate-200 flex-row items-center justify-between">
+                  <View>
+                    <Text className="text-[10px] uppercase font-bold text-slate-400">CERTIFIED SIGN-OFF</Text>
+                    <Text className="text-sm font-bold text-slate-800 mt-0.5">
+                      {selectedReport?.signOff || 'Prof. Asanka Wijesinghe'}
+                    </Text>
+                    <Text className="text-xs text-slate-500">Chief Librarian / University Management</Text>
+                  </View>
+                  <View className="items-center justify-center rounded-xl bg-emerald-50 px-3 py-1.5 border border-emerald-300">
+                    <Ionicons name="shield-checkmark" size={20} color="#059669" />
+                    <Text className="text-[9px] font-black text-emerald-800 uppercase mt-0.5">SEAL VERIFIED</Text>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+
+            {/* Viewer Bottom Actions */}
+            <View className="p-4 border-t border-slate-100 bg-white flex-row space-x-3">
+              <Pressable
+  onPress={handleSavePdf}
+                className="flex-1 flex-row items-center justify-center rounded-2xl bg-blue-950 py-4 shadow-sm active:opacity-90 mr-2"
+              >
+                <Ionicons name="download" size={17} color="#FFFFFF" />
+                <Text className="ml-2 text-sm font-bold text-white">Save PDF</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setDocumentViewerVisible(false)}
+                className="flex-1 flex-row items-center justify-center rounded-2xl bg-slate-100 py-4 active:opacity-80"
+              >
+                <Text className="text-sm font-bold text-slate-800">Close</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* CRUD: Modal for Generating New Report */}
       <Modal
