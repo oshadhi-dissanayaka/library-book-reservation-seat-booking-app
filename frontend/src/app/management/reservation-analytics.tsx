@@ -53,7 +53,7 @@ export default function ReservationAnalyticsScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/reservation-analytics`);
+      const response = await fetch(`${API_BASE_URL}/management/reservation-analytics`);
       if (!response.ok) throw new Error('Network error');
       const result = await response.json();
       setData(result);

@@ -29,4 +29,7 @@ router.get("/:id", getReservationById);
 // PATCH /api/seat-reservations/:id/cancel — cancel an active reservation (WF-14)
 router.patch("/:id/cancel", cancelReservation);
 
+// DELETE /api/seat-reservations/:id (kept for origin/dev compatibility)
+router.delete("/:id", cancelReservation);
+
 module.exports = router;

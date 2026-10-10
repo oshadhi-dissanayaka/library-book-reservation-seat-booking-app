@@ -43,7 +43,7 @@ export default function ManagementReportsScreen() {
   // Fetch reports (CRUD: Read)
   const loadReports = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/reports`);
+      const response = await fetch(`${API_BASE_URL}/management/reports`);
       if (!response.ok) throw new Error('Network error');
       const data = await response.json();
       setReports(data.reports);
@@ -109,7 +109,7 @@ export default function ManagementReportsScreen() {
 
     setSubmitting(true);
     try {
-      const response = await fetch(`${API_BASE_URL}/reports`, {
+      const response = await fetch(`${API_BASE_URL}/management/reports`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -163,7 +163,7 @@ export default function ManagementReportsScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              await fetch(`${API_BASE_URL}/reports/${id}`, { method: 'DELETE' });
+              await fetch(`${API_BASE_URL}/management/reports/${id}`, { method: 'DELETE' });
             } catch (e) {
               // ignore
             }
@@ -183,7 +183,7 @@ export default function ManagementReportsScreen() {
   const handleToggleAudit = async (report: ReportItem) => {
     const nextStatus = report.status === 'Ready to review' ? 'Audited & Verified' : 'Ready to review';
     try {
-      await fetch(`${API_BASE_URL}/reports/${report.id}`, {
+      await fetch(`${API_BASE_URL}/management/reports/${report.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: nextStatus }),

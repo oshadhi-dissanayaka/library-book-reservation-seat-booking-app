@@ -1,12 +1,11 @@
 import { API_BASE } from "@/lib/api";
 
 /**
- * Base URL for the management (university management) API section.
+ * Base URL for API requests, e.g. "http://192.168.1.5:5000/api".
  *
- * The backend mounts management routes at `/api/management`
- * (see backend/server.js), and management screens append their own
- * paths (e.g. `${API_BASE_URL}/dashboard`).
- *
- * Derived from the single shared API configuration in `src/lib/api.ts`.
+ * Management screens append their own section path (e.g.
+ * `${API_BASE_URL}/management/dashboard`), matching the backend mount at
+ * `/api/management` (see backend/server.js). Derived from the single shared
+ * API configuration in `src/lib/api.ts`.
  */
-export const API_BASE_URL = `${API_BASE}/management`;
+export const API_BASE_URL = API_BASE;

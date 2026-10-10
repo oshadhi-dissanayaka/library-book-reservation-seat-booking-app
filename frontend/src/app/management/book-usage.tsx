@@ -42,7 +42,7 @@ export default function BookUsageScreen() {
 
   const loadData = useCallback(async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/book-usage`);
+      const response = await fetch(`${API_BASE_URL}/management/book-usage`);
       if (!response.ok) throw new Error('Network error');
       const result = await response.json();
       setData(result);
