@@ -18,8 +18,6 @@ import {
  * selected on WF-10 (after the room is known), not here.
  */
 
-// Backend address — shared API configuration (src/lib/api.ts): the Expo
-// dev-server host (works on a physical phone) and the backend's port 5000.
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
 
 type ReadingRoom = {
@@ -34,47 +32,27 @@ type ReadingRoom = {
 };
 
 const MONTH_NAMES = [
-  'January',
-  'February',
-  'March',
-  'April',
-  'May',
-  'June',
-  'July',
-  'August',
-  'September',
-  'October',
-  'November',
-  'December',
+  'January','February','March','April','May','June',
+  'July','August','September','October','November','December',
 ];
 
-/** "2026-10-08" in local time, matching the reservation API format. */
 function formatDateIso(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(
-    date.getDate()
-  ).padStart(2, '0')}`;
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 }
 
-/** "08 October 2026" — no date library needed. */
 function formatDateLong(date: Date): string {
-  return `${String(date.getDate()).padStart(2, '0')} ${
-    MONTH_NAMES[date.getMonth()]
-  } ${date.getFullYear()}`;
+  return `${String(date.getDate()).padStart(2, '0')} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
 }
 
-/** Backend stores 24-hour "HH:mm" ("22:00"); the UI shows "10:00 PM". */
 function formatTime(value: string): string {
   const [hourString, minute] = value.split(':');
-  if (!hourString || !minute) {
-    return value;
-  }
+  if (!hourString || !minute) return value;
   const hour = Number(hourString);
   const hour12 = hour % 12 === 0 ? 12 : hour % 12;
   const period = hour >= 12 ? 'PM' : 'AM';
   return `${String(hour12).padStart(2, '0')}:${minute} ${period}`;
 }
 
-// Today + the next 6 days (matches the "Next 7 days available" hint).
 const DATE_OPTIONS = Array.from({ length: 7 }, (_, index) => {
   const date = new Date();
   date.setHours(12, 0, 0, 0);
@@ -82,274 +60,233 @@ const DATE_OPTIONS = Array.from({ length: 7 }, (_, index) => {
   return {
     iso: formatDateIso(date),
     label: formatDateLong(date),
+    dayName: index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : date.toLocaleDateString('en-GB', { weekday: 'short' }),
+    dayNum: String(date.getDate()),
   };
 });
+
+// Room icons by zone / name heuristic
+function roomIcon(room: ReadingRoom): string {
+  const z = room.zone.toLowerCase();
+  if (z.includes('quiet') || z.includes('silent')) return '🔇';
+  if (z.includes('group') || z.includes('collaborat')) return '👥';
+  if (z.includes('computer') || z.includes('digital')) return '💻';
+  return '📚';
+}
 
 export default function ReadingRoomSearchScreen() {
   const [selectedDate, setSelectedDate] = useState(DATE_OPTIONS[0].iso);
   const [rooms, setRooms] = useState<ReadingRoom[]>([]);
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null);
-  const [roomDropdownOpen, setRoomDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const selectedDateIndex = DATE_OPTIONS.findIndex((option) => option.iso === selectedDate);
+
+  const selectedDateIndex = DATE_OPTIONS.findIndex((o) => o.iso === selectedDate);
   const selectedDateOption = DATE_OPTIONS[selectedDateIndex];
-  const selectedRoom = rooms.find((room) => room._id === selectedRoomId) ?? null;
 
   const loadRooms = async () => {
     setLoading(true);
     setError('');
     try {
       const response = await fetch(`${API_BASE_URL}/api/reading-rooms`);
-      if (!response.ok) {
-        throw new Error(`Server responded with status ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`Server responded with status ${response.status}`);
       const data = await response.json();
       setRooms(Array.isArray(data.readingRooms) ? data.readingRooms : []);
     } catch (requestError) {
       setRooms([]);
-      const detail =
-        requestError instanceof Error ? requestError.message : 'Unknown error';
-      setError(
-        `Could not load reading rooms. ${detail}. Please check that the backend server is running.`
-      );
+      const detail = requestError instanceof Error ? requestError.message : 'Unknown error';
+      setError(`Could not load reading rooms. ${detail}. Please check that the backend server is running.`);
     } finally {
       setLoading(false);
     }
   };
 
-  useEffect(() => {
-    loadRooms();
-  }, []);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => { loadRooms(); }, []);
 
   return (
-    <ScrollView
-      style={styles.screen}
-      contentContainerStyle={styles.content}
-      keyboardShouldPersistTaps="handled">
-      <Text style={styles.breadcrumb}>STUDY SPACES</Text>
-      <Text style={styles.heading}>Reading Room Search</Text>
-      <Text style={styles.subheading}>
-        Select your preferred date and hall to browse real-time desk
-        availability. You will choose a fixed 2-hour time block after picking
-        a room.
-      </Text>
+    <ScrollView style={styles.screen} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+      {/* Page header */}
+      <View style={styles.pageHeader}>
+        <Text style={styles.breadcrumb}>STUDY SPACES</Text>
+        <Text style={styles.subheading}>Choose a date and select a room to view real-time seat availability.</Text>
+      </View>
 
-      {/* Room and date selection */}
-      <View style={styles.card}>
-        <View style={styles.labelRow}>
-          <Text style={styles.label}>Reading Room</Text>
-          <Text style={styles.labelHint}>Required</Text>
-        </View>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={
-            selectedRoom ? `Selected room, ${selectedRoom.name}` : 'Select reading room'
-          }
-          accessibilityState={{ expanded: roomDropdownOpen, disabled: loading }}
-          disabled={loading}
-          style={[styles.selectField, loading && styles.controlDisabled]}
-          onPress={() => setRoomDropdownOpen((open) => !open)}>
-          <Text style={[styles.selectText, !selectedRoom && styles.placeholderText]}>
-            {loading ? 'Loading reading rooms…' : selectedRoom?.name ?? 'Select Reading Room'}
-          </Text>
-          <Text style={styles.selectChevron}>{roomDropdownOpen ? '▴' : '▾'}</Text>
-        </Pressable>
-
-        {roomDropdownOpen && (
-          <View style={styles.dropdownMenu}>
-            {rooms.map((room) => {
-              const isSelected = room._id === selectedRoomId;
-              return (
-                <Pressable
-                  key={room._id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                  style={[styles.dropdownOption, isSelected && styles.dropdownOptionSelected]}
-                  onPress={() => {
-                    setSelectedRoomId(room._id);
-                    setRoomDropdownOpen(false);
-                  }}>
-                  <Text
-                    style={[
-                      styles.dropdownOptionText,
-                      isSelected && styles.dropdownOptionTextSelected,
-                    ]}>
-                    {room.name}
-                  </Text>
-                  {isSelected && <Text style={styles.dropdownCheck}>✓</Text>}
-                </Pressable>
-              );
-            })}
-          </View>
-        )}
-
-        <View style={styles.labelRow}>
-          <Text style={styles.label}>Date</Text>
-          <Text style={styles.labelHint}>Next 7 days only</Text>
-        </View>
-        <View style={styles.dateSelector}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Select previous date"
-            accessibilityState={{ disabled: selectedDateIndex === 0 }}
-            disabled={selectedDateIndex === 0}
-            style={[
-              styles.dateArrowButton,
-              selectedDateIndex === 0 && styles.controlDisabled,
-            ]}
-            onPress={() =>
-              setSelectedDate(DATE_OPTIONS[Math.max(0, selectedDateIndex - 1)].iso)
-            }>
-            <Text style={styles.dateArrow}>▲</Text>
-          </Pressable>
-
-          <View style={styles.selectedDateCard}>
-            <Text style={styles.dateContext}>
-              {selectedDateIndex === 0 ? 'Today' : `Day ${selectedDateIndex + 1} of 7`}
-            </Text>
-            <Text style={styles.selectedDateText}>{selectedDateOption.label}</Text>
-          </View>
-
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Select next date"
-            accessibilityState={{ disabled: selectedDateIndex === DATE_OPTIONS.length - 1 }}
-            disabled={selectedDateIndex === DATE_OPTIONS.length - 1}
-            style={[
-              styles.dateArrowButton,
-              selectedDateIndex === DATE_OPTIONS.length - 1 && styles.controlDisabled,
-            ]}
-            onPress={() =>
-              setSelectedDate(
-                DATE_OPTIONS[Math.min(DATE_OPTIONS.length - 1, selectedDateIndex + 1)].iso
-              )
-            }>
-            <Text style={styles.dateArrow}>▼</Text>
-          </Pressable>
+      {/* Date picker — horizontal chip strip */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>SELECT DATE</Text>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateChipRow}>
+          {DATE_OPTIONS.map((opt, index) => {
+            const isSelected = opt.iso === selectedDate;
+            return (
+              <Pressable
+                key={opt.iso}
+                accessibilityRole="button"
+                accessibilityLabel={`Select date ${opt.label}`}
+                accessibilityState={{ selected: isSelected }}
+                style={[styles.dateChip, isSelected && styles.dateChipSelected]}
+                onPress={() => setSelectedDate(opt.iso)}>
+                <Text style={[styles.dateChipDay, isSelected && styles.dateChipDaySelected]}>
+                  {opt.dayName}
+                </Text>
+                <Text style={[styles.dateChipNum, isSelected && styles.dateChipNumSelected]}>
+                  {opt.dayNum}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+        <View style={styles.selectedDatePill}>
+          <Text style={styles.selectedDatePillText}>📅  {selectedDateOption?.label ?? ''}</Text>
         </View>
       </View>
 
-      {loading && (
-        <View style={styles.card}>
-          <ActivityIndicator size="large" color="#1E3A8A" />
-          <Text style={styles.stateText}>Loading reading rooms…</Text>
-        </View>
-      )}
+      {/* Room list */}
+      <View style={styles.section}>
+        <Text style={styles.sectionLabel}>AVAILABLE ROOMS</Text>
 
-      {!loading && error !== '' && (
-        <View style={styles.card}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.primaryButton} onPress={loadRooms}>
-            <Text style={styles.primaryButtonText}>TRY AGAIN</Text>
-          </Pressable>
-        </View>
-      )}
+        {loading && (
+          <View style={styles.stateCard}>
+            <ActivityIndicator size="large" color="#2456B3" />
+            <Text style={styles.stateText}>Loading reading rooms…</Text>
+          </View>
+        )}
 
-      {!loading && error === '' && rooms.length === 0 && (
-        <View style={styles.card}>
-          <Text style={styles.stateText}>No reading rooms available</Text>
-        </View>
-      )}
+        {!loading && error !== '' && (
+          <View style={[styles.stateCard, styles.errorCard]}>
+            <Text style={styles.errorIcon}>⚠️</Text>
+            <Text style={styles.errorTitle}>Could not load rooms</Text>
+            <Text style={styles.errorMessage}>Please check that the backend server is running and try again.</Text>
+            <Pressable style={styles.retryButton} onPress={loadRooms} accessibilityRole="button" accessibilityLabel="Retry loading rooms">
+              <Text style={styles.retryButtonText}>Try Again</Text>
+            </Pressable>
+          </View>
+        )}
 
-      {!loading && error === '' && selectedRoom && (
-          <View style={styles.card}>
-            <Text style={styles.roomName}>{selectedRoom.name}</Text>
-            <Text style={styles.roomMeta}>
-              {selectedRoom.building} · Floor {selectedRoom.floor}
-            </Text>
+        {!loading && error === '' && rooms.length === 0 && (
+          <View style={styles.stateCard}>
+            <Text style={{ fontSize: 36, marginBottom: 8 }}>🏛️</Text>
+            <Text style={styles.stateTitle}>No rooms available</Text>
+            <Text style={styles.stateText}>There are no reading rooms configured at this time.</Text>
+          </View>
+        )}
 
+        {!loading && error === '' && rooms.map((room) => (
+          <View key={room._id} style={styles.roomCard}>
+            {/* Card header */}
+            <View style={styles.roomCardHeader}>
+              <View style={styles.roomIconWrap}>
+                <Text style={styles.roomIconText}>{roomIcon(room)}</Text>
+              </View>
+              <View style={styles.roomCardHeaderText}>
+                <Text style={styles.roomName}>{room.name}</Text>
+                <Text style={styles.roomMeta}>{room.building} {'\u00B7'} Floor {room.floor}</Text>
+              </View>
+              <View style={styles.openBadge}>
+                <View style={styles.openDot} />
+                <Text style={styles.openBadgeText}>Open</Text>
+              </View>
+            </View>
+
+            {/* Zone tag row */}
             <View style={styles.tagRow}>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>{selectedRoom.zone}</Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>Power at Every Desk</Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>High-speed Eduroam</Text>
-              </View>
+              <View style={styles.tag}><Text style={styles.tagText}>{room.zone}</Text></View>
+              <View style={styles.tag}><Text style={styles.tagText}>⚡ Power at Desk</Text></View>
+              <View style={styles.tag}><Text style={styles.tagText}>📶 Eduroam Wi-Fi</Text></View>
             </View>
 
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Opening hours</Text>
-              <Text style={styles.detailValue}>
-                {formatTime(selectedRoom.openingTime)} – {formatTime(selectedRoom.closingTime)}
-              </Text>
+            {/* Info rows */}
+            <View style={styles.divider} />
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Hours</Text>
+              <Text style={styles.infoValue}>{formatTime(room.openingTime)} {'\u2013'} {formatTime(room.closingTime)}</Text>
             </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>Total seats</Text>
-              <Text style={styles.detailValue}>{selectedRoom.totalSeats} seats</Text>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoLabel}>Capacity</Text>
+              <Text style={styles.infoValue}>{room.totalSeats} seats</Text>
             </View>
 
+            {/* CTA */}
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel={`View available seats in ${selectedRoom.name}`}
-              style={styles.primaryButton}
+              accessibilityLabel={`View available seats in ${room.name}`}
+              cssInterop={false}
+              style={({ pressed }) => [styles.viewButton, pressed && styles.viewButtonPressed]}
               onPress={() => {
-                // WF-10: open the seat grid for this room + date. Time is
-                // chosen on WF-10 as a fixed 2-hour block.
                 router.push({
                   pathname: '/reading-rooms/[id]/seats',
                   params: {
-                    id: selectedRoom._id,
-                    // `isoDate` is what the APIs use ("YYYY-MM-DD"); `date`
-                    // stays the friendly label purely for display on WF-10.
+                    id: room._id,
                     isoDate: selectedDate,
                     date: selectedDateOption.label,
                   },
                 });
               }}>
-              <Text style={styles.primaryButtonText}>VIEW AVAILABLE SEATS →</Text>
+              <Text style={styles.viewButtonText}>View Seats</Text>
+              <Text style={styles.viewButtonArrow}>→</Text>
             </Pressable>
           </View>
-      )}
+        ))}
+      </View>
 
       {/* Guidelines */}
       <View style={styles.infoCard}>
-        <Text style={styles.infoTitle}>Reading Room Guidelines</Text>
-        <Text style={styles.infoText}>
-          Reservations are held for 15 minutes past the booking start time. Please
-          silence all mobile devices before entering Reading Room A. Desk check-in is
-          verified automatically at the entryway terminal.
+        <Text style={styles.infoCardTitle}>Reading Room Guidelines</Text>
+        <Text style={styles.infoCardText}>
+          Reservations are held for 15 minutes past the booking start time.
+          Please silence all mobile devices before entering.
+          Desk check-in is verified at the entryway terminal.
         </Text>
-        <Text style={styles.infoMeta}>08:00 AM – 10:00 PM · Student ID Required</Text>
+        <Text style={styles.infoCardMeta}>08:00 AM {'\u2013'} 10:00 PM {'\u00B7'} Student ID Required</Text>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#F6F7FB',
+  screen: { flex: 1, backgroundColor: '#F4F6FB' },
+  content: { paddingHorizontal: 18, paddingTop: 18, paddingBottom: 48, gap: 20 },
+
+  pageHeader: { gap: 6 },
+  breadcrumb: { fontSize: 11, fontWeight: '700', color: '#2456B3', letterSpacing: 1.2, textTransform: 'uppercase' },
+  subheading: { fontSize: 14, lineHeight: 20, color: '#66738A' },
+
+  section: { gap: 10 },
+  sectionLabel: { fontSize: 11, fontWeight: '700', color: '#66738A', letterSpacing: 1, textTransform: 'uppercase' },
+
+  // Date chips
+  dateChipRow: { gap: 8, paddingVertical: 2 },
+  dateChip: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: '#E5E9F1',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    minWidth: 58,
+    gap: 2,
   },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-    gap: 16,
+  dateChipSelected: { backgroundColor: '#102B69', borderColor: '#102B69' },
+  dateChipDay: { fontSize: 11, fontWeight: '700', color: '#66738A', textTransform: 'uppercase', letterSpacing: 0.3 },
+  dateChipDaySelected: { color: '#BEC9E8' },
+  dateChipNum: { fontSize: 19, fontWeight: '800', color: '#17243F' },
+  dateChipNumSelected: { color: '#FFFFFF' },
+  selectedDatePill: {
+    backgroundColor: '#EAF0FC',
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    alignSelf: 'flex-start',
   },
-  breadcrumb: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1D4ED8',
-    letterSpacing: 1,
-  },
-  heading: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#12203F',
-  },
-  subheading: {
-    fontSize: 15,
-    lineHeight: 21,
-    color: '#4A5165',
-  },
-  card: {
+  selectedDatePillText: { fontSize: 13, fontWeight: '700', color: '#2456B3' },
+
+  // State cards
+  stateCard: {
     backgroundColor: '#FFFFFF',
     borderRadius: 20,
-    padding: 18,
+    padding: 28,
+    alignItems: 'center',
     gap: 10,
     shadowColor: '#12203F',
     shadowOpacity: 0.06,
@@ -357,203 +294,79 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  stateTitle: { fontSize: 16, fontWeight: '800', color: '#17243F', textAlign: 'center' },
+  stateText: { fontSize: 14, color: '#66738A', textAlign: 'center', lineHeight: 20 },
+  errorCard: { borderLeftWidth: 3, borderLeftColor: '#B33535' },
+  errorIcon: { fontSize: 28 },
+  errorTitle: { fontSize: 16, fontWeight: '800', color: '#17243F' },
+  errorMessage: { fontSize: 13, color: '#66738A', textAlign: 'center', lineHeight: 18 },
+  retryButton: {
     marginTop: 4,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#12203F',
-  },
-  labelHint: {
-    fontSize: 12,
-    color: '#7A8199',
-  },
-  selectField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: '#EEF1F8',
+    backgroundColor: '#2456B3',
     borderRadius: 14,
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 11,
+    paddingHorizontal: 24,
   },
-  selectText: {
-    fontSize: 16,
-    color: '#12203F',
-    fontWeight: '600',
+  retryButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800', letterSpacing: 0.4 },
+
+  // Room card
+  roomCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    padding: 18,
+    gap: 12,
+    shadowColor: '#12203F',
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
-  selectChevron: {
-    fontSize: 16,
-    color: '#4A5165',
-  },
-  placeholderText: {
-    color: '#7A8199',
-  },
-  dropdownMenu: {
-    backgroundColor: '#EEF1F8',
+  roomCardHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  roomIconWrap: {
+    width: 46,
+    height: 46,
     borderRadius: 14,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#D7DDEC',
-  },
-  dropdownOption: {
-    minHeight: 48,
-    paddingHorizontal: 16,
-    paddingVertical: 13,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#C9D2E8',
-  },
-  dropdownOptionSelected: {
-    backgroundColor: '#DDE5F7',
-  },
-  dropdownOptionText: {
-    fontSize: 16,
-    color: '#12203F',
-  },
-  dropdownOptionTextSelected: {
-    color: '#1E3A8A',
-    fontWeight: '700',
-  },
-  dropdownCheck: {
-    color: '#1E3A8A',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  dateSelector: {
-    alignItems: 'center',
-    gap: 8,
-  },
-  dateArrowButton: {
-    width: '100%',
-    minHeight: 36,
-    borderRadius: 12,
-    backgroundColor: '#EEF1F8',
+    backgroundColor: '#EAF0FC',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  dateArrow: {
-    fontSize: 15,
-    color: '#1E3A8A',
-    fontWeight: '800',
-  },
-  selectedDateCard: {
-    width: '100%',
-    paddingVertical: 13,
-    paddingHorizontal: 16,
+  roomIconText: { fontSize: 22 },
+  roomCardHeaderText: { flex: 1, gap: 2 },
+  roomName: { fontSize: 17, fontWeight: '800', color: '#17243F' },
+  roomMeta: { fontSize: 13, color: '#66738A' },
+  openBadge: { flexDirection: 'row', alignItems: 'center', gap: 5, backgroundColor: '#E8F6EF', borderRadius: 10, paddingHorizontal: 9, paddingVertical: 4 },
+  openDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#16875B' },
+  openBadgeText: { fontSize: 11, fontWeight: '800', color: '#16875B', letterSpacing: 0.4 },
+
+  tagRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  tag: { backgroundColor: '#EEF1F8', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 5 },
+  tagText: { fontSize: 11, fontWeight: '600', color: '#2456B3' },
+
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: '#E5E9F1' },
+  infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  infoLabel: { fontSize: 13, color: '#66738A' },
+  infoValue: { fontSize: 13, fontWeight: '700', color: '#17243F' },
+
+  viewButton: {
+    flexDirection: 'row',
+    backgroundColor: '#2456B3',
     borderRadius: 14,
-    backgroundColor: '#1E3A8A',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    gap: 2,
-  },
-  dateContext: {
-    color: '#DDE5F7',
-    fontSize: 12,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.6,
-  },
-  selectedDateText: {
-    color: '#FFFFFF',
-    fontSize: 17,
-    fontWeight: '800',
-  },
-  controlDisabled: {
-    opacity: 0.45,
-  },
-  primaryButton: {
-    backgroundColor: '#1E3A8A',
-    borderRadius: 16,
-    paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  primaryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-  },
-  stateText: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#4A5165',
-    textAlign: 'center',
-  },
-  errorText: {
-    fontSize: 14,
-    lineHeight: 20,
-    fontWeight: '600',
-    color: '#B91C1C',
-    textAlign: 'center',
-  },
-  roomName: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#12203F',
-  },
-  roomMeta: {
-    fontSize: 14,
-    color: '#4A5165',
-  },
-  tagRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: 8,
-    marginVertical: 4,
+    marginTop: 4,
+    minHeight: 52,
+    width: '100%',
   },
-  tag: {
-    backgroundColor: '#EEF1F8',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  tagText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#1E3A8A',
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: '#E3E6EF',
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#7A8199',
-  },
-  detailValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#12203F',
-  },
-  infoCard: {
-    backgroundColor: '#E9EDF9',
-    borderRadius: 20,
-    padding: 18,
-    gap: 8,
-  },
-  infoTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: '#12203F',
-  },
-  infoText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: '#3A425A',
-  },
-  infoMeta: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#1E3A8A',
-  },
+  viewButtonPressed: { opacity: 0.88 },
+  viewButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
+  viewButtonArrow: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+
+  // Info card
+  infoCard: { backgroundColor: '#E9EDF9', borderRadius: 20, padding: 18, gap: 8 },
+  infoCardTitle: { fontSize: 15, fontWeight: '800', color: '#17243F' },
+  infoCardText: { fontSize: 13, lineHeight: 19, color: '#3A425A' },
+  infoCardMeta: { fontSize: 12, fontWeight: '700', color: '#2456B3' },
 });
