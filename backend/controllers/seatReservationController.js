@@ -4,6 +4,8 @@ const ReadingRoom = require("../models/ReadingRoom");
 
 const SEAT_TAKEN_MESSAGE =
   "This seat is no longer available. Please select another seat.";
+const STUDENT_TIME_CONFLICT_MESSAGE =
+  "You already have an active seat reservation during this time. Choose a different time or cancel your existing reservation.";
 
 // Fallback owner used only when a request does not carry a studentId.
 // The frontend always sends its centralized identity (see
@@ -99,13 +101,22 @@ function parseIsoDate(value) {
   return date;
 }
 
-/** Today's date as local "YYYY-MM-DD" (matches the stored format). */
-function todayIso() {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(
-    2,
-    "0"
-  )}-${String(now.getDate()).padStart(2, "0")}`;
+// Room opening times and booking dates are Sri Lankan university wall time,
+// regardless of the timezone used by the server host.
+const libraryClockFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Colombo",
+  year: "numeric", month: "2-digit", day: "2-digit",
+  hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+});
+
+function libraryClock() {
+  const parts = Object.fromEntries(
+    libraryClockFormatter.formatToParts(new Date()).map(({ type, value }) => [type, value])
+  );
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    minutes: Number(parts.hour) * 60 + Number(parts.minute),
+  };
 }
 
 function normalizeStudentId(value) {
@@ -155,7 +166,7 @@ async function validateSeatRequest({
     return { status: 400, message: "Date must be a valid calendar date" };
   }
 
-  if (date < todayIso()) {
+  if (date < libraryClock().date) {
     return { status: 400, message: "Date cannot be in the past" };
   }
 
@@ -208,12 +219,14 @@ async function validateSeatRequest({
     }
 
     // A block that already started today cannot be reserved.
-    if (date === todayIso()) {
+    const now = libraryClock();
+    if (date < now.date) {
+      return { status: 400, message: "Date cannot be in the past" };
+    }
+    if (date === now.date) {
       const start = blockStartMinutes(block);
-      const now = new Date();
-      const nowMinutes = now.getHours() * 60 + now.getMinutes();
 
-      if (start !== null && start <= nowMinutes) {
+      if (start !== null && start <= now.minutes) {
         return {
           status: 400,
           message: "This time block has already started. Please pick a later block.",
@@ -240,6 +253,29 @@ async function findConflictingSeats({ readingRoom, date, blocks, seatNumber }) {
   });
 
   return conflicts.length > 0;
+}
+
+// Compare actual intervals, rather than equal strings: rooms may open at
+// different times, so 08:00-10:00 also conflicts with 09:00-11:00.
+async function hasStudentTimeConflict({ studentId, date, blocks }) {
+  const existing = await Reservation.find({ studentId, date, status: "active" });
+  return existing.some((reservation) => {
+    const existingStart = blockStartMinutes(reservation.time);
+    if (existingStart === null) return false;
+    return blocks.some((block) => {
+      const start = blockStartMinutes(block);
+      return start < existingStart + BLOCK_MINUTES && existingStart < start + BLOCK_MINUTES;
+    });
+  });
+}
+
+function occupiedMinutesFor(block) {
+  const start = blockStartMinutes(block);
+  return Array.from({ length: BLOCK_MINUTES }, (_, offset) => start + offset);
+}
+
+function isStudentTimeIndexConflict(error) {
+  return Boolean(error.keyPattern?.occupiedMinutes || error.message?.includes("uniq_active_student_minute"));
 }
 
 // POST /api/seat-reservations
@@ -269,16 +305,23 @@ const createReservation = async (req, res) => {
     const { room, blocks } = validation;
     const normalizedTime = blocks[0];
 
+    if (await hasStudentTimeConflict({ studentId, date, blocks })) {
+      return res.status(409).json({ code: "STUDENT_TIME_CONFLICT", message: STUDENT_TIME_CONFLICT_MESSAGE });
+    }
+
     if (await findConflictingSeats({ readingRoom, date, blocks, seatNumber })) {
       return res.status(409).json({
         message: SEAT_TAKEN_MESSAGE,
       });
     }
 
+    // Wait for unique indexes before accepting concurrent booking requests.
+    await Reservation.init();
     const reservation = await Reservation.create({
       readingRoom,
       date,
       time: normalizedTime,
+      occupiedMinutes: occupiedMinutesFor(normalizedTime),
       seatNumber,
       status: "active",
       studentId,
@@ -304,6 +347,9 @@ const createReservation = async (req, res) => {
     });
   } catch (error) {
     if (error && error.code === 11000) {
+      if (isStudentTimeIndexConflict(error)) {
+        return res.status(409).json({ code: "STUDENT_TIME_CONFLICT", message: STUDENT_TIME_CONFLICT_MESSAGE });
+      }
       return res.status(409).json({
         message: SEAT_TAKEN_MESSAGE,
       });
@@ -373,6 +419,10 @@ const createReservationBatch = async (req, res) => {
 
     const { blocks: normalizedBlocks } = validation;
 
+    if (await hasStudentTimeConflict({ studentId, date, blocks: normalizedBlocks })) {
+      return res.status(409).json({ code: "STUDENT_TIME_CONFLICT", message: STUDENT_TIME_CONFLICT_MESSAGE });
+    }
+
     // Fail the WHOLE booking before writing anything if one block is taken.
     if (
       await findConflictingSeats({
@@ -387,11 +437,13 @@ const createReservationBatch = async (req, res) => {
       });
     }
 
+    await Reservation.init();
     for (const block of normalizedBlocks) {
       const reservation = await Reservation.create({
         readingRoom,
         date,
         time: block,
+        occupiedMinutes: occupiedMinutesFor(block),
         seatNumber,
         status: "active",
         studentId,
@@ -431,6 +483,9 @@ const createReservationBatch = async (req, res) => {
     }
 
     if (error && error.code === 11000) {
+      if (isStudentTimeIndexConflict(error)) {
+        return res.status(409).json({ code: "STUDENT_TIME_CONFLICT", message: STUDENT_TIME_CONFLICT_MESSAGE });
+      }
       return res.status(409).json({
         message: SEAT_TAKEN_MESSAGE,
       });

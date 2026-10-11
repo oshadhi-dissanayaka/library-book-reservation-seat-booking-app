@@ -42,7 +42,7 @@ export default function BookUsageScreen() {
   const [data, setData] = useState<BookUsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'Weekly' | 'Monthly' | 'Semester'>('Monthly');
+  const selectedFilter = 'Monthly';
   const [periodModalVisible, setPeriodModalVisible] = useState(false);
   const [selectedPeriodName, setSelectedPeriodName] = useState('September 2026');
 
@@ -146,19 +146,6 @@ export default function BookUsageScreen() {
   void loadData('Monthly');
 }, [loadData]);
 
-  const handleFilterChange = (tab: 'Weekly' | 'Monthly' | 'Semester') => {
-  setSelectedFilter(tab);
-
-  if (tab === 'Weekly') {
-    setSelectedPeriodName('Current Week (Sep 15–21)');
-  } else if (tab === 'Monthly') {
-    setSelectedPeriodName('September 2026');
-  } else {
-    setSelectedPeriodName('Semester 2 (2026)');
-  }
-
-  void loadData(tab);
-};
 
   const handleExport = async () => {
   try {
@@ -453,7 +440,7 @@ export default function BookUsageScreen() {
             </View>
           </View>
 
-          {/* Filter Period Box with interactive tabs */}
+          {/* Filter Period Box */}
           <View className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
             <View className="flex-row items-center justify-between">
               <Text className="text-sm font-bold text-slate-900">
@@ -464,28 +451,13 @@ export default function BookUsageScreen() {
               </Text>
             </View>
 
-            {/* Tabs: Weekly, Monthly, Semester */}
-            <View className="mt-3.5 flex-row rounded-xl bg-slate-100 p-1">
-              {(['Weekly', 'Monthly', 'Semester'] as const).map((tab) => {
-                const active = selectedFilter === tab;
-                return (
-                  <Pressable
-                    key={tab}
-                    onPress={() => handleFilterChange(tab)}
-                    className={`flex-1 items-center rounded-lg py-2.5 ${
-                      active ? 'bg-blue-950 shadow-sm' : ''
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs ${
-                        active ? 'font-bold text-white' : 'font-medium text-slate-600'
-                      }`}
-                    >
-                      {tab}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+            {/* Monthly reporting period */}
+            <View className="mt-3 flex-row rounded-xl bg-slate-100 p-1">
+              <View className="flex-1 items-center rounded-lg bg-white py-1.5 shadow-sm">
+                <Text className="text-xs font-bold text-blue-950">
+                  Monthly
+                </Text>
+              </View>
             </View>
 
             {/* Dropdown Selector - Interactive */}
@@ -543,16 +515,14 @@ export default function BookUsageScreen() {
 
             <View className="mt-3 space-y-2">
               {[
-                { title: 'Current Week (Sep 15–21, 2026)', mode: 'Weekly' as const },
                 { title: 'September 2026 (Active Cycle)', mode: 'Monthly' as const },
                 { title: 'August 2026 (Archived Cycle)', mode: 'Monthly' as const },
-                { title: 'Semester 2 (2026) Complete Term', mode: 'Semester' as const },
               ].map((opt) => (
                 <Pressable
                   key={opt.title}
                   onPress={() => {
                     setSelectedPeriodName(opt.title);
-                    handleFilterChange(opt.mode);
+                    void loadData(opt.mode);
                     setPeriodModalVisible(false);
                   }}
                   className={`flex-row items-center justify-between rounded-2xl p-3.5 my-1 border ${
