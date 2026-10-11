@@ -21,6 +21,8 @@ import { Book, Reservation, booksApi, reservationsApi } from '@/lib/api';
 import { getCurrentUser, loadAuthSession } from '@/lib/auth-session';
 import { formatDateTime, formatPickupDateTime, getPickupDateOptions } from '@/lib/dates';
 
+// These buttons use StyleSheet and pressed-state callbacks. Bypass NativeWind
+// interop so native Pressable receives the style callback unchanged.
 const palette = {
   ink: '#17243f',
   muted: '#66738a',
@@ -243,7 +245,7 @@ export default function BookSearchScreen() {
             </View>
           </View>
           <Link href="/my-reservations" asChild>
-            <Pressable style={({ pressed }) => [styles.reservationsLink, pressed && styles.pressed]} accessibilityRole="button">
+            <Pressable cssInterop={false} style={({ pressed }) => [styles.reservationsLink, pressed && styles.pressed]} accessibilityRole="button">
               <SymbolView name={{ ios: 'bookmark', android: 'bookmark_border', web: 'bookmark_border' }} tintColor={palette.navy} size={16} />
               <Text style={styles.reservationsLinkText}>My reservations</Text>
             </Pressable>
@@ -291,7 +293,7 @@ export default function BookSearchScreen() {
         {(categories.length > 0 || total > 0) && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
             {displayedCategories.map((item) => (
-              <Pressable
+              <Pressable cssInterop={false}
                 key={item}
                 onPress={() => setCategory(item)}
                 style={({ pressed }) => [styles.filterChip, category === item && styles.filterChipSelected, pressed && styles.pressed]}
@@ -300,7 +302,7 @@ export default function BookSearchScreen() {
                 <Text style={[styles.filterText, category === item && styles.filterTextSelected]}>{item}</Text>
               </Pressable>
             ))}
-            <Pressable
+            <Pressable cssInterop={false}
               onPress={() => setAvailableOnly((value) => !value)}
               style={({ pressed }) => [styles.filterChip, availableOnly && styles.filterChipSelected, pressed && styles.pressed]}
               accessibilityRole="button"
@@ -315,7 +317,7 @@ export default function BookSearchScreen() {
             <View style={styles.stateIcon}><SymbolView name={{ ios: 'wifi.exclamationmark', android: 'wifi_off', web: 'wifi_off' }} tintColor={palette.navy} size={22} /></View>
             <Text style={styles.stateTitle}>Catalog unavailable</Text>
             <Text style={styles.stateCopy}>{error}</Text>
-            <Pressable onPress={() => void loadBooks()} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+            <Pressable cssInterop={false} onPress={() => void loadBooks()} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
               <Text style={styles.primaryButtonText}>Try again</Text>
             </Pressable>
           </View>
@@ -329,12 +331,12 @@ export default function BookSearchScreen() {
             <View style={styles.stateIcon}><SymbolView name={{ ios: 'books.vertical', android: 'menu_book', web: 'menu_book' }} tintColor={palette.navy} size={22} /></View>
             <Text style={styles.stateTitle}>{search ? 'No matching books' : 'Catalog is empty'}</Text>
             <Text style={styles.stateCopy}>{search ? 'Try another title, author, or ISBN.' : 'No books have been added to the MongoDB catalog yet.'}</Text>
-            {search.length > 0 && <Pressable onPress={() => setSearch('')}><Text style={styles.clearText}>Clear search</Text></Pressable>}
+            {search.length > 0 && <Pressable cssInterop={false} onPress={() => setSearch('')}><Text style={styles.clearText}>Clear search</Text></Pressable>}
           </View>
         ) : (
           <View style={styles.bookList}>
             {books.map((book) => (
-              <Pressable key={book._id} onPress={() => openBook(book)} style={({ pressed }) => [styles.bookRow, pressed && styles.bookRowPressed]} accessibilityRole="button">
+              <Pressable cssInterop={false} key={book._id} onPress={() => openBook(book)} style={({ pressed }) => [styles.bookRow, pressed && styles.bookRowPressed]} accessibilityRole="button">
                 <View style={[styles.bookCover, book.availableCopies === 0 && styles.bookCoverUnavailable]}>
                   {book.coverImage ? (
                     <Image source={{ uri: book.coverImage }} resizeMode="cover" style={styles.bookCoverImage} />
@@ -375,16 +377,16 @@ export default function BookSearchScreen() {
         <SafeAreaView style={styles.modalSafeArea} edges={['top', 'bottom']}>
           <KeyboardAvoidingView style={styles.modalFlex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
             <View style={styles.modalTopBar}>
-              <Pressable onPress={booking ? () => { setBooking(false); setFormError(''); } : closeBook} accessibilityRole="button" accessibilityLabel={booking ? 'Back to book details' : 'Close book details'} style={styles.modalIconButton}>
+              <Pressable cssInterop={false} onPress={booking ? () => { setBooking(false); setFormError(''); } : closeBook} accessibilityRole="button" accessibilityLabel={booking ? 'Back to book details' : 'Close book details'} style={styles.modalIconButton}>
                 <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} tintColor={palette.ink} size={18} />
               </Pressable>
               <Text style={styles.modalTopTitle}>{createdReservation ? 'Reservation pass' : booking ? 'Reserve book' : 'Book details'}</Text>
-              <Pressable onPress={closeBook} accessibilityRole="button" accessibilityLabel="Close" style={styles.modalIconButton}>
+              <Pressable cssInterop={false} onPress={closeBook} accessibilityRole="button" accessibilityLabel="Close" style={styles.modalIconButton}>
                 <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} tintColor={palette.ink} size={18} />
               </Pressable>
             </View>
 
-            <ScrollView contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
+            <ScrollView style={styles.modalScroll} contentContainerStyle={styles.modalContent} keyboardShouldPersistTaps="handled">
               {selectedBook && !createdReservation && (
                 <View style={styles.detailBookHeader}>
                   <View style={styles.detailCover}>
@@ -449,7 +451,7 @@ export default function BookSearchScreen() {
                   </View>
 
                   <Text style={styles.passNotice}>Bring your student card to {createdReservation.pickupLocation} before the reservation expires.</Text>
-                  <Pressable
+                  <Pressable cssInterop={false}
                     onPress={() => {
                       closeBook();
                       router.push({ pathname: '/my-reservations', params: { patronId } });
@@ -459,7 +461,7 @@ export default function BookSearchScreen() {
                     <Text style={styles.primaryButtonText}>View my reservation</Text>
                     <SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} tintColor={palette.white} size={16} />
                   </Pressable>
-                  <Pressable onPress={closeBook} style={({ pressed }) => [styles.returnButton, pressed && styles.pressed]} accessibilityRole="button">
+                  <Pressable cssInterop={false} onPress={closeBook} style={({ pressed }) => [styles.returnButton, pressed && styles.pressed]} accessibilityRole="button">
                     <Text style={styles.returnButtonText}>Return to search results</Text>
                   </Pressable>
                   <Text style={styles.passHelp}>Need a different pickup date? You can change it from My Reservations.</Text>
@@ -487,7 +489,7 @@ export default function BookSearchScreen() {
                   </View>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateOptions}>
                     {pickupDates.map((option) => (
-                      <Pressable key={option.value} onPress={() => setPickupDate(option.value)} style={({ pressed }) => [styles.dateOption, pickupDate === option.value && styles.dateOptionSelected, pressed && styles.pressed]} accessibilityRole="button" accessibilityState={{ selected: pickupDate === option.value }}>
+                      <Pressable cssInterop={false} key={option.value} onPress={() => setPickupDate(option.value)} style={({ pressed }) => [styles.dateOption, pickupDate === option.value && styles.dateOptionSelected, pressed && styles.pressed]} accessibilityRole="button" accessibilityState={{ selected: pickupDate === option.value }}>
                         <Text style={[styles.dateOptionDay, pickupDate === option.value && styles.dateOptionTextSelected]}>{option.label}</Text>
                         <Text style={[styles.dateOptionDate, pickupDate === option.value && styles.dateOptionTextSelected]}>{option.day}</Text>
                       </Pressable>
@@ -527,14 +529,14 @@ export default function BookSearchScreen() {
                       />
                     </View>
                     <View style={styles.periodPicker}>
-                      <Pressable
+                      <Pressable cssInterop={false}
                         onPress={() => setPickupPeriod('AM')}
                         style={({ pressed }) => [styles.periodButton, pickupPeriod === 'AM' && styles.periodButtonSelected, pressed && styles.pressed]}
                         accessibilityRole="button"
                         accessibilityState={{ selected: pickupPeriod === 'AM' }}>
                         <Text style={[styles.periodButtonText, pickupPeriod === 'AM' && styles.periodButtonTextSelected]}>AM</Text>
                       </Pressable>
-                      <Pressable
+                      <Pressable cssInterop={false}
                         onPress={() => setPickupPeriod('PM')}
                         style={({ pressed }) => [styles.periodButton, pickupPeriod === 'PM' && styles.periodButtonSelected, pressed && styles.pressed]}
                         accessibilityRole="button"
@@ -552,7 +554,7 @@ export default function BookSearchScreen() {
                     </View>
                     <Text style={styles.pickupCopies}>{selectedBook.availableCopies} cop{selectedBook.availableCopies === 1 ? 'y' : 'ies'}</Text>
                     {!editingPickupLocation && pickupLocation ? (
-                      <Pressable onPress={() => setEditingPickupLocation(true)} accessibilityRole="button">
+                      <Pressable cssInterop={false} onPress={() => setEditingPickupLocation(true)} accessibilityRole="button">
                         <Text style={styles.changeDeskText}>Change</Text>
                       </Pressable>
                     ) : null}
@@ -569,7 +571,7 @@ export default function BookSearchScreen() {
                     />
                   ) : null}
 
-                  <Pressable onPress={() => setTermsAccepted((value) => !value)} style={styles.termsRow} accessibilityRole="checkbox" accessibilityState={{ checked: termsAccepted }}>
+                  <Pressable cssInterop={false} onPress={() => setTermsAccepted((value) => !value)} style={styles.termsRow} accessibilityRole="checkbox" accessibilityState={{ checked: termsAccepted }}>
                     <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
                       {termsAccepted && <SymbolView name={{ ios: 'checkmark', android: 'check', web: 'check' }} tintColor={palette.white} size={13} />}
                     </View>
@@ -577,14 +579,6 @@ export default function BookSearchScreen() {
                   </Pressable>
 
                   {formError ? <Text style={styles.formError}>{formError}</Text> : null}
-                  <Pressable onPress={() => void submitReservation()} disabled={submitting || selectedBook.availableCopies === 0} style={({ pressed }) => [styles.primaryButton, styles.fullButton, (submitting || selectedBook.availableCopies === 0) && styles.disabledButton, pressed && styles.pressed]}>
-                    {submitting ? <ActivityIndicator color={palette.white} size="small" /> : <SymbolView name={{ ios: 'lock.fill', android: 'lock', web: 'lock' }} tintColor={palette.white} size={15} />}
-                    <Text style={styles.primaryButtonText}>{submitting ? 'Reserving…' : 'Confirm reservation'}</Text>
-                  </Pressable>
-                  <Pressable onPress={cancelBooking} disabled={submitting} style={({ pressed }) => [styles.cancelReservationButton, pressed && styles.pressed]} accessibilityRole="button">
-                    <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} tintColor={palette.navy} size={14} />
-                    <Text style={styles.cancelReservationText}>Cancel and return to search</Text>
-                  </Pressable>
                   <Text style={styles.privacyNote}>Your ID is used only to look up and manage this reservation.</Text>
                 </View>
               ) : selectedBook ? (
@@ -608,14 +602,29 @@ export default function BookSearchScreen() {
                   {selectedBook.publisher ? <Text style={styles.detailMeta}>{selectedBook.publisher}</Text> : null}
                   {selectedBook.description ? <Text style={styles.description}>{selectedBook.description}</Text> : null}
 
-                  <Pressable onPress={() => setBooking(true)} disabled={selectedBook.availableCopies === 0} style={({ pressed }) => [styles.primaryButton, styles.fullButton, selectedBook.availableCopies === 0 && styles.disabledButton, pressed && styles.pressed]}>
-                    <SymbolView name={{ ios: 'bookmark.fill', android: 'bookmark', web: 'bookmark' }} tintColor={palette.white} size={16} />
-                    <Text style={styles.primaryButtonText}>{selectedBook.availableCopies > 0 ? 'Reserve this book' : 'No copies available'}</Text>
-                  </Pressable>
                   {selectedBook.availableCopies === 0 && <Text style={styles.privacyNote}>Search again later to check availability.</Text>}
                 </View>
               ) : null}
             </ScrollView>
+            {selectedBook && !createdReservation && (
+              <View style={styles.modalActions}>
+                <Pressable cssInterop={false}
+                  onPress={booking ? () => void submitReservation() : () => setBooking(true)}
+                  disabled={submitting || selectedBook.availableCopies === 0}
+                  accessibilityRole="button"
+                  accessibilityState={{ disabled: submitting || selectedBook.availableCopies === 0, busy: submitting }}
+                  style={({ pressed }) => [styles.primaryButton, (submitting || selectedBook.availableCopies === 0) && styles.disabledButton, pressed && styles.pressed]}>
+                  {submitting ? <ActivityIndicator color={palette.white} size="small" /> : <SymbolView name={booking ? { ios: 'lock.fill', android: 'lock', web: 'lock' } : { ios: 'bookmark.fill', android: 'bookmark', web: 'bookmark' }} tintColor={palette.white} size={18} />}
+                  <Text style={styles.primaryButtonText}>{submitting ? 'Reserving…' : selectedBook.availableCopies === 0 ? 'No copies available' : booking ? 'Confirm reservation' : 'Reserve this book'}</Text>
+                </Pressable>
+                {booking && (
+                  <Pressable cssInterop={false} onPress={cancelBooking} disabled={submitting} style={({ pressed }) => [styles.cancelReservationButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityState={{ disabled: submitting }}>
+                    <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} tintColor={palette.navy} size={16} />
+                    <Text style={styles.cancelReservationText}>Cancel and return to search</Text>
+                  </Pressable>
+                )}
+              </View>
+            )}
           </KeyboardAvoidingView>
         </SafeAreaView>
       </Modal>
@@ -626,13 +635,13 @@ export default function BookSearchScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: palette.canvas },
   page: { width: '100%', maxWidth: 760, alignSelf: 'center', paddingHorizontal: 20, paddingBottom: 36 },
-  topBar: { minHeight: 62, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  topBar: { minHeight: 62, paddingVertical: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 10, alignItems: 'center', justifyContent: 'space-between' },
   brandRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   brandMark: { width: 36, height: 36, borderRadius: 11, backgroundColor: palette.navy, alignItems: 'center', justifyContent: 'center' },
   brandTitle: { color: palette.ink, fontSize: 11, fontWeight: '800', letterSpacing: 0.7 },
   brandSubtitle: { color: palette.muted, fontSize: 9, fontWeight: '700', marginTop: 3 },
-  reservationsLink: { minHeight: 38, paddingHorizontal: 11, borderRadius: 10, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.white, flexDirection: 'row', alignItems: 'center', gap: 7 },
-  reservationsLinkText: { color: palette.navy, fontSize: 12, fontWeight: '700' },
+  reservationsLink: { minHeight: 44, paddingHorizontal: 12, borderRadius: 10, borderWidth: 1, borderColor: '#b8c8e6', backgroundColor: palette.white, flexDirection: 'row', alignItems: 'center', gap: 7 },
+  reservationsLinkText: { color: palette.navy, fontSize: 14, fontWeight: '700' },
   hero: { marginTop: 16, padding: 20, borderRadius: 18, backgroundColor: palette.navy },
   eyebrow: { color: '#c3d4fb', fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
   heroTitle: { color: palette.white, fontSize: 30, lineHeight: 34, fontWeight: '800', marginTop: 10 },
@@ -677,17 +686,19 @@ const styles = StyleSheet.create({
   clearText: { color: palette.blue, fontSize: 12, fontWeight: '700', padding: 12 },
   loadingPanel: { minHeight: 185, alignItems: 'center', justifyContent: 'center', gap: 12 },
   loadingText: { color: palette.muted, fontSize: 12 },
-  primaryButton: { minHeight: 42, paddingHorizontal: 14, borderRadius: 10, backgroundColor: palette.navy, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
-  primaryButtonText: { color: palette.white, fontSize: 12, fontWeight: '800' },
+  primaryButton: { minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 10, backgroundColor: palette.navy, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8 },
+  primaryButtonText: { flexShrink: 1, color: palette.white, fontSize: 15, lineHeight: 21, fontWeight: '800', textAlign: 'center' },
   fullButton: { width: '100%', marginTop: 14 },
-  disabledButton: { backgroundColor: '#9aa5b7' },
-  cancelReservationButton: { minHeight: 40, width: '100%', marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 9, backgroundColor: palette.paleBlue },
-  cancelReservationText: { color: palette.navy, fontSize: 12, fontWeight: '800' },
+  disabledButton: { backgroundColor: '#59677e' },
+  cancelReservationButton: { minHeight: 44, width: '100%', paddingHorizontal: 12, paddingVertical: 10, marginTop: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 9, borderWidth: 1, borderColor: '#b8c8e6', backgroundColor: palette.paleBlue },
+  cancelReservationText: { flexShrink: 1, color: palette.navy, fontSize: 14, fontWeight: '800', textAlign: 'center' },
   footerNote: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 2, marginTop: 17 },
   footerText: { flex: 1, color: palette.muted, fontSize: 10, lineHeight: 15 },
   pressed: { opacity: 0.78 },
   modalSafeArea: { flex: 1, backgroundColor: palette.canvas },
   modalFlex: { flex: 1, alignSelf: 'center', width: '100%', maxWidth: 700 },
+  modalScroll: { flex: 1 },
+  modalActions: { padding: 16, borderTopWidth: 1, borderTopColor: palette.line, backgroundColor: palette.white },
   modalTopBar: { height: 56, paddingHorizontal: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: palette.line, backgroundColor: palette.white },
   modalIconButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
   modalTopTitle: { color: palette.ink, fontSize: 14, fontWeight: '800' },
@@ -771,7 +782,7 @@ const styles = StyleSheet.create({
   passStatus: { color: palette.green, fontSize: 10, fontWeight: '800', textTransform: 'capitalize' },
   passDetailValue: { maxWidth: '60%', color: palette.ink, fontSize: 10, fontWeight: '700', textAlign: 'right' },
   passNotice: { width: '100%', maxWidth: 440, padding: 10, marginTop: 9, borderRadius: 8, color: palette.navy, backgroundColor: palette.paleBlue, fontSize: 9, lineHeight: 14 },
-  returnButton: { width: '100%', maxWidth: 440, minHeight: 42, marginTop: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 9, backgroundColor: '#e5eafb' },
-  returnButtonText: { color: palette.navy, fontSize: 12, fontWeight: '800' },
+  returnButton: { width: '100%', maxWidth: 440, minHeight: 44, padding: 12, marginTop: 8, alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderWidth: 1, borderColor: '#b8c8e6', backgroundColor: '#e5eafb' },
+  returnButtonText: { color: palette.navy, fontSize: 14, fontWeight: '800', textAlign: 'center' },
   passHelp: { color: palette.muted, fontSize: 9, textAlign: 'center', marginTop: 11 },
 });

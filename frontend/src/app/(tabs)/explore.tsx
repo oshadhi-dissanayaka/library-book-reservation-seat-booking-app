@@ -17,6 +17,8 @@ import { Reservation, reservationsApi } from '@/lib/api';
 import { getCurrentUser, loadAuthSession } from '@/lib/auth-session';
 import { formatDateTime, formatPickupDate, getPickupDateOptions } from '@/lib/dates';
 
+// These buttons use StyleSheet and pressed-state callbacks. Bypass NativeWind
+// interop so native Pressable receives the style callback unchanged.
 const palette = {
   ink: '#17243f',
   muted: '#66738a',
@@ -178,7 +180,7 @@ export default function ReservationsScreen() {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void findReservations(patronId, true)} tintColor={palette.navy} />}>
         <View style={styles.topBar}>
           <Link href={{ pathname: '/my-reservations', params: { patronId } }} asChild>
-            <Pressable style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Back to My Reservations">
+            <Pressable cssInterop={false} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Back to My Reservations">
               <SymbolView name={{ ios: 'chevron.left', android: 'arrow_back', web: 'arrow_back' }} tintColor={palette.navy} size={17} />
             </Pressable>
           </Link>
@@ -205,7 +207,7 @@ export default function ReservationsScreen() {
               style={styles.lookupInput}
               value={patronId}
             />
-            <Pressable onPress={() => void findReservations()} disabled={loading} style={({ pressed }) => [styles.lookupButton, pressed && styles.pressed]} accessibilityRole="button">
+            <Pressable cssInterop={false} onPress={() => void findReservations()} disabled={loading} style={({ pressed }) => [styles.lookupButton, pressed && styles.pressed]} accessibilityRole="button">
               {loading ? <ActivityIndicator color={palette.white} size="small" /> : <SymbolView name={{ ios: 'magnifyingglass', android: 'search', web: 'search' }} tintColor={palette.white} size={16} />}
               <Text style={styles.lookupButtonText}>{loading ? 'Loading' : 'Find'}</Text>
             </Pressable>
@@ -233,11 +235,11 @@ export default function ReservationsScreen() {
             </View>
 
             <View style={styles.tabs}>
-              <Pressable onPress={() => setActiveTab('active')} style={[styles.tab, activeTab === 'active' && styles.tabSelected]} accessibilityRole="button" accessibilityState={{ selected: activeTab === 'active' }}>
+              <Pressable cssInterop={false} onPress={() => setActiveTab('active')} style={[styles.tab, activeTab === 'active' && styles.tabSelected]} accessibilityRole="button" accessibilityState={{ selected: activeTab === 'active' }}>
                 <Text style={[styles.tabText, activeTab === 'active' && styles.tabTextSelected]}>Active</Text>
                 <Text style={[styles.tabCount, activeTab === 'active' && styles.tabCountSelected]}>{activeReservations.length}</Text>
               </Pressable>
-              <Pressable onPress={() => setActiveTab('history')} style={[styles.tab, activeTab === 'history' && styles.tabSelected]} accessibilityRole="button" accessibilityState={{ selected: activeTab === 'history' }}>
+              <Pressable cssInterop={false} onPress={() => setActiveTab('history')} style={[styles.tab, activeTab === 'history' && styles.tabSelected]} accessibilityRole="button" accessibilityState={{ selected: activeTab === 'history' }}>
                 <Text style={[styles.tabText, activeTab === 'history' && styles.tabTextSelected]}>History</Text>
                 <Text style={[styles.tabCount, activeTab === 'history' && styles.tabCountSelected]}>{pastReservations.length}</Text>
               </Pressable>
@@ -247,7 +249,7 @@ export default function ReservationsScreen() {
               <Text style={styles.filterCaption}>FILTER BY PICKUP DATE</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateFilters}>
                 {dateFilterOptions.map((option) => (
-                  <Pressable
+                  <Pressable cssInterop={false}
                     key={option.value}
                     onPress={() => setDateFilter(option.value)}
                     style={({ pressed }) => [styles.dateFilterChip, dateFilter === option.value && styles.dateFilterChipSelected, pressed && styles.pressed]}
@@ -265,11 +267,11 @@ export default function ReservationsScreen() {
                 <Text style={styles.emptyTitle}>{hasReservationFilters ? 'No matching reservations' : activeTab === 'active' ? 'No active reservations' : 'No reservation history'}</Text>
                 <Text style={styles.emptyCopy}>{hasReservationFilters ? 'No reservations match this pickup date.' : activeTab === 'active' ? 'Find a title in the catalog and reserve an available copy.' : 'Completed, cancelled, or expired book reservations will appear here.'}</Text>
                 {hasReservationFilters ? (
-                  <Pressable onPress={() => setDateFilter('all')} style={({ pressed }) => [styles.clearFiltersButton, pressed && styles.pressed]} accessibilityRole="button">
+                  <Pressable cssInterop={false} onPress={() => setDateFilter('all')} style={({ pressed }) => [styles.clearFiltersButton, pressed && styles.pressed]} accessibilityRole="button">
                     <Text style={styles.clearFiltersText}>Show any date</Text>
                   </Pressable>
                 ) : activeTab === 'active' ? (
-                  <Link href="/books" asChild><Pressable style={({ pressed }) => [styles.catalogButton, pressed && styles.pressed]}><Text style={styles.catalogButtonText}>Browse catalog</Text><SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} tintColor={palette.white} size={15} /></Pressable></Link>
+                  <Link href="/books" asChild><Pressable cssInterop={false} style={({ pressed }) => [styles.catalogButton, pressed && styles.pressed]}><Text style={styles.catalogButtonText}>Browse catalog</Text><SymbolView name={{ ios: 'arrow.right', android: 'arrow_forward', web: 'arrow_forward' }} tintColor={palette.white} size={15} /></Pressable></Link>
                 ) : null}
               </View>
             ) : (
@@ -319,7 +321,7 @@ export default function ReservationsScreen() {
                           <Text style={styles.editLabel}>CHOOSE A NEW PICKUP DATE</Text>
                           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateOptions}>
                             {pickupDates.map((option) => (
-                              <Pressable key={option.value} onPress={() => setEditDate(option.value)} style={[styles.dateOption, editDate === option.value && styles.dateOptionSelected]} accessibilityRole="button" accessibilityState={{ selected: editDate === option.value }}>
+                              <Pressable cssInterop={false} key={option.value} onPress={() => setEditDate(option.value)} style={[styles.dateOption, editDate === option.value && styles.dateOptionSelected]} accessibilityRole="button" accessibilityState={{ selected: editDate === option.value }}>
                                 <Text style={[styles.dateOptionDay, editDate === option.value && styles.dateOptionTextSelected]}>{option.label}</Text>
                                 <Text style={[styles.dateOptionDate, editDate === option.value && styles.dateOptionTextSelected]}>{option.day}</Text>
                               </Pressable>
@@ -337,8 +339,8 @@ export default function ReservationsScreen() {
                             value={editTime}
                           />
                           <View style={styles.actionRow}>
-                            <Pressable onPress={() => setEditingId(null)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Keep date</Text></Pressable>
-                            <Pressable onPress={() => void savePickupDate(reservation)} disabled={isSaving} style={[styles.smallPrimaryButton, isSaving && styles.disabledButton]}>
+                            <Pressable cssInterop={false} onPress={() => setEditingId(null)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Keep date</Text></Pressable>
+                            <Pressable cssInterop={false} onPress={() => void savePickupDate(reservation)} disabled={isSaving} style={[styles.smallPrimaryButton, isSaving && styles.disabledButton]}>
                               {isSaving ? <ActivityIndicator color={palette.white} size="small" /> : null}
                               <Text style={styles.smallPrimaryButtonText}>{isSaving ? 'Saving' : 'Save date'}</Text>
                             </Pressable>
@@ -350,8 +352,8 @@ export default function ReservationsScreen() {
                         <View style={styles.cancelPanel}>
                           <Text style={styles.cancelPrompt}>Cancel this reservation? The copy will be released to the catalog.</Text>
                           <View style={styles.actionRow}>
-                            <Pressable onPress={() => setCancelId(null)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Keep reservation</Text></Pressable>
-                            <Pressable onPress={() => void cancelReservation(reservation)} disabled={isSaving} style={[styles.cancelConfirmButton, isSaving && styles.disabledButton]}>
+                            <Pressable cssInterop={false} onPress={() => setCancelId(null)} style={styles.secondaryButton}><Text style={styles.secondaryButtonText}>Keep reservation</Text></Pressable>
+                            <Pressable cssInterop={false} onPress={() => void cancelReservation(reservation)} disabled={isSaving} style={[styles.cancelConfirmButton, isSaving && styles.disabledButton]}>
                               {isSaving ? <ActivityIndicator color={palette.white} size="small" /> : null}
                               <Text style={styles.cancelConfirmText}>{isSaving ? 'Cancelling' : 'Cancel reservation'}</Text>
                             </Pressable>
@@ -361,11 +363,11 @@ export default function ReservationsScreen() {
 
                       {isActive && editingId !== reservation._id && cancelId !== reservation._id && (
                         <View style={styles.actions}>
-                          <Pressable onPress={() => beginEdit(reservation)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]} accessibilityRole="button">
+                          <Pressable cssInterop={false} onPress={() => beginEdit(reservation)} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]} accessibilityRole="button">
                             <SymbolView name={{ ios: 'calendar', android: 'edit_calendar', web: 'edit_calendar' }} tintColor={palette.navy} size={14} />
                             <Text style={styles.secondaryButtonText}>Change pickup date</Text>
                           </Pressable>
-                          <Pressable onPress={() => setCancelId(reservation._id)} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Cancel reservation">
+                          <Pressable cssInterop={false} onPress={() => setCancelId(reservation._id)} style={({ pressed }) => [styles.cancelButton, pressed && styles.pressed]} accessibilityRole="button" accessibilityLabel="Cancel reservation">
                             <SymbolView name={{ ios: 'xmark', android: 'close', web: 'close' }} tintColor={palette.red} size={15} />
                           </Pressable>
                         </View>
@@ -403,8 +405,8 @@ const styles = StyleSheet.create({
   lookupCopy: { color: palette.muted, fontSize: 11, marginTop: 4 },
   lookupForm: { flexDirection: 'row', gap: 8, marginTop: 13 },
   lookupInput: { flex: 1, minWidth: 0, height: 43, paddingHorizontal: 11, borderWidth: 1, borderColor: palette.line, borderRadius: 8, color: palette.ink, backgroundColor: '#fbfcfe', fontSize: 12 },
-  lookupButton: { width: 92, minHeight: 43, borderRadius: 8, backgroundColor: palette.navy, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
-  lookupButtonText: { color: palette.white, fontSize: 12, fontWeight: '800' },
+  lookupButton: { minWidth: 100, minHeight: 48, paddingHorizontal: 14, paddingVertical: 10, borderRadius: 8, backgroundColor: palette.navy, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
+  lookupButtonText: { color: palette.white, fontSize: 14, fontWeight: '800' },
   errorPanel: { paddingHorizontal: 13, paddingVertical: 11, marginTop: 11, borderRadius: 9, backgroundColor: palette.paleRed },
   errorText: { color: palette.red, fontSize: 11, lineHeight: 16 },
   sectionHeading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 24 },
@@ -447,9 +449,9 @@ const styles = StyleSheet.create({
   infoLabel: { flex: 1, color: palette.muted, fontSize: 10 },
   infoValue: { maxWidth: '53%', color: palette.ink, fontSize: 10, fontWeight: '700', textAlign: 'right' },
   actions: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 11, paddingTop: 10, borderTopWidth: 1, borderTopColor: palette.line },
-  secondaryButton: { minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 8, borderWidth: 1, borderColor: palette.line, backgroundColor: palette.white },
-  secondaryButtonText: { color: palette.navy, fontSize: 10, fontWeight: '700' },
-  cancelButton: { width: 36, height: 36, marginLeft: 'auto', borderRadius: 8, borderWidth: 1, borderColor: '#f1d6d4', alignItems: 'center', justifyContent: 'center', backgroundColor: palette.white },
+  secondaryButton: { minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: 8, borderWidth: 1, borderColor: '#b8c8e6', backgroundColor: palette.white },
+  secondaryButtonText: { flexShrink: 1, color: palette.navy, fontSize: 14, fontWeight: '700' },
+  cancelButton: { width: 44, height: 44, marginLeft: 'auto', borderRadius: 8, borderWidth: 1, borderColor: '#f1d6d4', alignItems: 'center', justifyContent: 'center', backgroundColor: palette.white },
   editPanel: { gap: 9, padding: 10, marginTop: 10, borderRadius: 9, backgroundColor: '#f6f8fc' },
   editLabel: { color: palette.muted, fontSize: 8, fontWeight: '800', letterSpacing: 0.6 },
   dateOptions: { gap: 6, paddingVertical: 2 },
@@ -459,22 +461,22 @@ const styles = StyleSheet.create({
   dateOptionDate: { color: palette.ink, fontSize: 10, fontWeight: '800', marginTop: 3 },
   dateOptionTextSelected: { color: palette.white },
   editTimeInput: { minHeight: 40, paddingHorizontal: 11, borderWidth: 1, borderColor: palette.line, borderRadius: 8, backgroundColor: palette.white, color: palette.ink, fontSize: 11 },
-  actionRow: { flexDirection: 'row', justifyContent: 'flex-end', gap: 8 },
-  smallPrimaryButton: { minWidth: 94, minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: palette.navy },
-  smallPrimaryButtonText: { color: palette.white, fontSize: 10, fontWeight: '800' },
-  disabledButton: { opacity: 0.55 },
+  actionRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'flex-end', gap: 8 },
+  smallPrimaryButton: { minWidth: 100, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: palette.navy },
+  smallPrimaryButtonText: { color: palette.white, fontSize: 14, fontWeight: '800' },
+  disabledButton: { backgroundColor: '#59677e' },
   cancelPanel: { gap: 8, padding: 10, marginTop: 10, borderRadius: 9, backgroundColor: palette.paleRed },
   cancelPrompt: { color: palette.ink, fontSize: 10, lineHeight: 15 },
-  cancelConfirmButton: { minWidth: 102, minHeight: 36, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: palette.red },
-  cancelConfirmText: { color: palette.white, fontSize: 10, fontWeight: '800' },
+  cancelConfirmButton: { minWidth: 110, minHeight: 44, paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: 8, backgroundColor: palette.red },
+  cancelConfirmText: { color: palette.white, fontSize: 14, fontWeight: '800' },
   emptyPanel: { minHeight: 220, marginTop: 11, paddingHorizontal: 20, paddingVertical: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: palette.line, borderRadius: 13, backgroundColor: palette.white },
   emptyIcon: { width: 47, height: 47, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.paleBlue },
   emptyTitle: { color: palette.ink, fontSize: 15, fontWeight: '800', textAlign: 'center', marginTop: 11 },
   emptyCopy: { maxWidth: 285, color: palette.muted, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 5 },
   clearFiltersButton: { minHeight: 36, paddingHorizontal: 12, marginTop: 11, justifyContent: 'center', borderRadius: 8, backgroundColor: palette.paleBlue },
   clearFiltersText: { color: palette.navy, fontSize: 10, fontWeight: '800' },
-  catalogButton: { minHeight: 40, paddingHorizontal: 13, marginTop: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, backgroundColor: palette.navy },
-  catalogButtonText: { color: palette.white, fontSize: 11, fontWeight: '800' },
+  catalogButton: { minHeight: 48, paddingHorizontal: 16, paddingVertical: 12, marginTop: 15, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 8, backgroundColor: palette.navy },
+  catalogButtonText: { color: palette.white, fontSize: 15, fontWeight: '800' },
   hintPanel: { minHeight: 65, padding: 12, gap: 10, flexDirection: 'row', alignItems: 'center', marginTop: 15, borderRadius: 10, backgroundColor: palette.paleBlue },
   hintText: { flex: 1, color: palette.navy, fontSize: 10, lineHeight: 15 },
   pressed: { opacity: 0.76 },
