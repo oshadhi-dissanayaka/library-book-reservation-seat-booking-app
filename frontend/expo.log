@@ -1,0 +1,36 @@
+Starting project at C:\HCI_APP\library-book-reservation-seat-booking-app-member1\frontend
+Using src/app as the root directory for Expo Router.
+React Compiler enabled
+Starting Metro Bundler
+
+Waiting on http://localhost:8082
+
+An update for expo is available: 57.0.26 → ~57.0.27
+4 other packages may need updating. Run npx expo install --check for details.
+Logs for your project will appear below.
+λ Bundled 9934ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1305 modules)
+Web Bundled 10870ms node_modules\expo-router\entry.js (1289 modules)
+λ Bundled 1275ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+Web Bundled 1507ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 60ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+Web Bundled 298ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 4427ms node_modules\expo-router\entry.js (1289 modules)
+Web  INFO  %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+Web  LOG  Running application "main" with appParams:
+ {"hydrate": undefined, "rootTag": "#root"} 
+Development-level warnings: ON.
+Performance optimizations: OFF.
+λ Bundled 1031ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+Web Bundled 1436ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 1102ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+Web Bundled 1548ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 31ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+Web Bundled 416ms node_modules\expo-router\entry.js (1 module)
+Web Bundled 999ms node_modules\expo-router\entry.js (1 module)
+λ Bundled 1052ms node_modules\expo\node_modules\@expo\cli\node_modules\@expo\router-server\node\render.js (1 module)
+Web Bundled 49ms node_modules\expo-router\entry.js (1 module)
+Web  INFO  %cDownload the React DevTools for a better development experience: https://react.dev/link/react-devtools font-weight:bold
+Web  LOG  Running application "main" with appParams:
+ {"hydrate": undefined, "rootTag": "#root"} 
+Development-level warnings: ON.
+Performance optimizations: OFF.
