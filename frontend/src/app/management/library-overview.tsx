@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 import { ManagementBottomBar } from '@/components/management-bottom-bar';
+import { ManagementHeader } from '@/components/management-header';
 import { API_BASE_URL } from '@/constants/api';
 
 type DashboardData = {
@@ -83,13 +84,22 @@ export default function LibraryOverviewScreen() {
   }, []);
 
   useEffect(() => {
-    loadDashboard();
+    const timer = setTimeout(() => void loadDashboard(), 0);
+    return () => clearTimeout(timer);
   }, [loadDashboard]);
 
   const onRefresh = () => {
     setRefreshing(true);
     loadDashboard();
   };
+
+  if (loading && !data) {
+    return (
+      <View className="flex-1 items-center justify-center bg-slate-50">
+        <ActivityIndicator size="large" color="#1E3A8A" />
+      </View>
+    );
+  }
 
   // Safe defaults matching Figma design if backend sends partial/old schema
   const totalBooks = data?.totalBooks ?? 1248;
@@ -115,6 +125,14 @@ export default function LibraryOverviewScreen() {
 
   return (
     <View className="flex-1 bg-slate-50">
+      <ManagementHeader
+        title="Management"
+        subtitle="Library Reports & Analytics"
+        showBackButton={false}
+        iconName="business"
+        badgeLabel="PORTAL"
+      />
+
       <ScrollView
         className="flex-1"
         contentContainerStyle={{ paddingBottom: 95 }}
@@ -123,47 +141,25 @@ export default function LibraryOverviewScreen() {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Top Header */}
-        <View className="flex-row items-center justify-between bg-white px-5 pb-3 pt-14 border-b border-slate-100">
-          <View className="flex-row items-center">
-            <View className="h-9 w-9 items-center justify-center rounded-xl bg-blue-50">
-              <Ionicons name="business" size={19} color="#1E3A8A" />
-            </View>
-            <View className="ml-2.5">
-              <Text className="text-sm font-bold text-slate-900 leading-tight">
-                Management
-              </Text>
-              <Text className="text-[10px] text-slate-500">
-                Library Reports & Analytics
-              </Text>
-            </View>
-          </View>
-
-          {/* Profile Circle Icon */}
-          <View className="h-8 w-8 items-center justify-center rounded-full bg-blue-950">
-            <Ionicons name="person" size={15} color="#FFFFFF" />
-          </View>
-        </View>
-
         <View className="px-4 pt-4">
           {/* Section Breadcrumb & Period */}
           <View className="flex-row items-end justify-between">
             <View>
-              <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+              <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
                 LIBRARY MANAGEMENT • EXECUTIVE OVERVIEW
               </Text>
-              <Text className="mt-0.5 text-xl font-bold text-slate-900">
+              <Text className="mt-0.5 text-2xl font-black text-slate-900">
                 Library Overview
               </Text>
             </View>
 
-            <View className="flex-row items-center rounded-xl bg-blue-50 px-2.5 py-1">
-              <Ionicons name="calendar-outline" size={12} color="#1E3A8A" />
+            <View className="flex-row items-center rounded-xl bg-blue-50 px-3 py-1.5 border border-blue-200">
+              <Ionicons name="calendar-outline" size={13} color="#1E3A8A" />
               <View className="ml-1.5 items-start">
-                <Text className="text-[8px] font-semibold text-slate-400 leading-none">
+                <Text className="text-[10px] font-bold text-slate-500 leading-none">
                   Sep
                 </Text>
-                <Text className="text-[10px] font-bold text-blue-950 leading-none">
+                <Text className="text-xs font-black text-blue-950 leading-none">
                   2026
                 </Text>
               </View>
@@ -173,12 +169,12 @@ export default function LibraryOverviewScreen() {
           {/* Live Telemetry Pill Card */}
           <View className="mt-3.5 flex-row items-center justify-between rounded-xl bg-white px-3.5 py-2.5 shadow-sm border border-slate-100">
             <View className="flex-row items-center">
-              <View className="mr-2 h-2 w-2 rounded-full bg-emerald-500" />
-              <Text className="text-[11px] font-medium text-slate-700">
+              <View className="mr-2 h-2.5 w-2.5 rounded-full bg-emerald-500" />
+              <Text className="text-xs font-semibold text-slate-700">
                 Live telemetry sync active
               </Text>
             </View>
-            <Text className="text-[10px] text-slate-400">
+            <Text className="text-xs text-slate-500">
               {data?.lastUpdated || 'Updated 10m ago'}
             </Text>
           </View>
@@ -186,36 +182,36 @@ export default function LibraryOverviewScreen() {
           {/* Card 1: Book Usage */}
           <Pressable
             onPress={() => router.push('/management/book-usage')}
-            className="mt-3 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 active:opacity-95"
+            className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 active:opacity-95"
           >
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <View className="h-7 w-7 items-center justify-center rounded-lg bg-blue-50">
-                  <Ionicons name="book-outline" size={16} color="#1E3A8A" />
+                <View className="h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                  <Ionicons name="book-outline" size={18} color="#1E3A8A" />
                 </View>
-                <Text className="ml-2 text-xs font-bold text-slate-900">
+                <Text className="ml-2.5 text-sm font-bold text-slate-900">
                   Book Usage
                 </Text>
               </View>
-              <View className="rounded-full bg-emerald-50 px-2 py-0.5">
-                <Text className="text-[10px] font-semibold text-emerald-600">
+              <View className="rounded-full bg-emerald-50 px-2.5 py-0.5 border border-emerald-200">
+                <Text className="text-xs font-bold text-emerald-700">
                   {bookGrowth}
                 </Text>
               </View>
             </View>
 
             <View className="mt-3 flex-row items-baseline">
-              <Text className="text-2xl font-bold tracking-tight text-blue-950">
+              <Text className="text-3xl font-black tracking-tight text-blue-950">
                 {totalBooks.toLocaleString()}
               </Text>
-              <Text className="ml-2 text-[11px] text-slate-500">
+              <Text className="ml-2 text-xs font-medium text-slate-500">
                 books borrowed
               </Text>
             </View>
 
             <View className="mt-2 flex-row items-center">
-              <Ionicons name="library-outline" size={13} color="#94A3B8" />
-              <Text className="ml-1.5 text-[10px] text-slate-500">
+              <Ionicons name="library-outline" size={14} color="#64748B" />
+              <Text className="ml-1.5 text-xs text-slate-500 font-medium">
                 Across {branches} campus libraries
               </Text>
             </View>
@@ -224,37 +220,37 @@ export default function LibraryOverviewScreen() {
           {/* Card 2: Reservations */}
           <Pressable
             onPress={() => router.push('/management/reservation-analytics')}
-            className="mt-3 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 active:opacity-95"
+            className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 active:opacity-95"
           >
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <View className="h-7 w-7 items-center justify-center rounded-lg bg-blue-50">
-                  <Ionicons name="calendar-outline" size={16} color="#1E3A8A" />
+                <View className="h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                  <Ionicons name="calendar-outline" size={18} color="#1E3A8A" />
                 </View>
-                <Text className="ml-2 text-xs font-bold text-slate-900">
+                <Text className="ml-2.5 text-sm font-bold text-slate-900">
                   Reservations
                 </Text>
               </View>
-              <Text className="text-[10px] text-slate-400">Holds Processed</Text>
+              <Text className="text-xs font-semibold text-slate-500">Holds Processed</Text>
             </View>
 
             <View className="mt-3 flex-row items-baseline">
-              <Text className="text-2xl font-bold tracking-tight text-blue-950">
+              <Text className="text-3xl font-black tracking-tight text-blue-950">
                 {totalReservations}
               </Text>
-              <Text className="ml-2 text-[11px] text-slate-500">total holds</Text>
+              <Text className="ml-2 text-xs font-medium text-slate-500">total holds</Text>
             </View>
 
             <View className="mt-2.5 flex-row items-center">
-              <View className="flex-row items-center">
+              <View className="flex-row items-center bg-emerald-50/80 px-2 py-0.5 rounded-md">
                 <View className="h-2 w-2 rounded-full bg-emerald-500" />
-                <Text className="ml-1.5 text-[10px] text-slate-600">
+                <Text className="ml-1.5 text-xs font-bold text-emerald-800">
                   {confirmedReservations} Confirmed
                 </Text>
               </View>
-              <View className="ml-4 flex-row items-center">
-                <View className="h-2 w-2 rounded-full bg-red-400" />
-                <Text className="ml-1.5 text-[10px] text-slate-600">
+              <View className="ml-3 flex-row items-center bg-red-50/80 px-2 py-0.5 rounded-md">
+                <View className="h-2 w-2 rounded-full bg-red-500" />
+                <Text className="ml-1.5 text-xs font-bold text-red-700">
                   {cancelledReservations} Cancelled
                 </Text>
               </View>
@@ -264,19 +260,19 @@ export default function LibraryOverviewScreen() {
           {/* Card 3: Seat Occupancy */}
           <Pressable
             onPress={() => router.push('/management/seat-occupancy')}
-            className="mt-3 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 active:opacity-95"
+            className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100 active:opacity-95"
           >
             <View className="flex-row items-center justify-between">
               <View className="flex-row items-center">
-                <View className="h-7 w-7 items-center justify-center rounded-lg bg-blue-50">
-                  <Ionicons name="desktop-outline" size={16} color="#1E3A8A" />
+                <View className="h-8 w-8 items-center justify-center rounded-lg bg-blue-50">
+                  <Ionicons name="desktop-outline" size={18} color="#1E3A8A" />
                 </View>
-                <Text className="ml-2 text-xs font-bold text-slate-900">
+                <Text className="ml-2.5 text-sm font-bold text-slate-900">
                   Seat Occupancy
                 </Text>
               </View>
-              <View className="rounded-full bg-amber-50 px-2 py-0.5">
-                <Text className="text-[10px] font-semibold text-amber-700">
+              <View className="rounded-full bg-amber-50 px-2.5 py-0.5 border border-amber-200">
+                <Text className="text-xs font-bold text-amber-800">
                   {seatOccupancyStatus}
                 </Text>
               </View>
@@ -284,59 +280,63 @@ export default function LibraryOverviewScreen() {
 
             <View className="mt-3 flex-row items-baseline justify-between">
               <View className="flex-row items-baseline">
-                <Text className="text-2xl font-bold tracking-tight text-blue-950">
+                <Text className="text-3xl font-black tracking-tight text-blue-950">
                   {seatOccupancy}%
                 </Text>
-                <Text className="ml-2 text-[11px] text-slate-500">
+                <Text className="ml-2 text-xs font-medium text-slate-500">
                   overall capacity
                 </Text>
               </View>
-              <Text className="text-[10px] text-slate-400">
+              <Text className="text-xs font-semibold text-slate-600">
                 {occupiedDesks} / {totalDesks} Desks
               </Text>
             </View>
 
             {/* Custom Progress Bar */}
-            <View className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+            <View className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
               <View
-                className="h-full rounded-full bg-blue-950"
+                className="h-full rounded-full bg-blue-600"
                 style={{ width: `${seatOccupancy}%` }}
               />
             </View>
           </Pressable>
 
           {/* Circulation Analytics - Chart Section */}
-          <View className="mt-3 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
-            <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">
+          <View className="mt-3.5 rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+            <Text className="text-xs font-bold uppercase tracking-wider text-slate-400">
               CIRCULATION ANALYTICS
             </Text>
             <View className="mt-0.5 flex-row items-center justify-between">
-              <Text className="text-xs font-bold text-slate-900">
+              <Text className="text-sm font-bold text-slate-900">
                 Book Usage Trend
               </Text>
-              <Text className="text-[10px] font-semibold text-blue-700">
-                {trajectory}
-              </Text>
+              <View className="rounded-full bg-blue-50 px-2.5 py-0.5 border border-blue-200">
+                <Text className="text-xs font-bold text-blue-950">
+                  {trajectory}
+                </Text>
+              </View>
             </View>
 
-            {/* 3 Bars Graph */}
+            {/* 3 Bars Graph with High Contrast Gradient-like Colors */}
             <View className="mt-6 flex-row items-end justify-around px-4">
-              {monthlyData.map((item) => {
+              {monthlyData.map((item, index) => {
                 const isSelected = item.month === 'Sep';
+                const barColor = isSelected ? '#1E3A8A' : index === 1 ? '#3B82F6' : '#93C5FD';
                 return (
                   <View key={item.month} className="items-center">
-                    <Text className="mb-1.5 text-[9px] font-semibold text-slate-400">
+                    <Text className={`mb-1.5 text-xs ${isSelected ? 'font-black text-blue-950' : 'font-bold text-slate-600'}`}>
                       {item.value}
                     </Text>
                     <View
-                      className={`w-14 rounded-t-lg ${
-                        isSelected ? 'bg-blue-950' : 'bg-blue-200'
-                      }`}
-                      style={{ height: (item.heightPct || 60) * 0.8 }}
+                      className="w-14 rounded-t-xl shadow-sm"
+                      style={{
+                        height: Math.max(22, (item.heightPct || 60) * 0.85),
+                        backgroundColor: barColor,
+                      }}
                     />
                     <Text
-                      className={`mt-2 text-[10px] font-bold ${
-                        isSelected ? 'text-blue-950' : 'text-slate-500'
+                      className={`mt-2 text-xs ${
+                        isSelected ? 'font-black text-blue-950 underline' : 'font-semibold text-slate-600'
                       }`}
                     >
                       {item.month}
@@ -347,9 +347,9 @@ export default function LibraryOverviewScreen() {
             </View>
 
             {/* Bottom Highlight Notice */}
-            <View className="mt-5 flex-row items-center rounded-xl bg-blue-50/70 p-2.5">
-              <Ionicons name="trending-up" size={14} color="#1E3A8A" />
-              <Text className="ml-2 flex-1 text-[10px] font-medium text-slate-700">
+            <View className="mt-5 flex-row items-center rounded-xl bg-blue-50 p-3 border border-blue-100">
+              <Ionicons name="trending-up" size={16} color="#1E3A8A" />
+              <Text className="ml-2 flex-1 text-xs font-medium text-slate-700 leading-4">
                 {highlight}
               </Text>
             </View>
@@ -358,14 +358,14 @@ export default function LibraryOverviewScreen() {
           {/* View Detailed Reports Button */}
           <Pressable
             onPress={() => router.push('/management/reports')}
-            className="mt-4 flex-row items-center justify-center rounded-2xl bg-blue-950 py-3.5 shadow-sm active:opacity-90"
+            className="mt-4 flex-row items-center justify-center rounded-2xl bg-blue-950 py-4 shadow-sm active:opacity-90"
           >
-            <Text className="text-xs font-bold tracking-wide text-white">
+            <Text className="text-sm font-bold tracking-wide text-white">
               View Detailed Reports
             </Text>
             <Ionicons
               name="arrow-forward"
-              size={15}
+              size={16}
               color="#FFFFFF"
               style={{ marginLeft: 6 }}
             />
