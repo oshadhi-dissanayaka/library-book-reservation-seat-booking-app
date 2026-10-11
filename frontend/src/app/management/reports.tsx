@@ -6,12 +6,16 @@ import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { ManagementBottomBar } from '@/components/management-bottom-bar';
@@ -754,72 +758,94 @@ export default function ManagementReportsScreen() {
         </View>
       </Modal>
 
-      {/* CRUD: Modal for Generating New Report */}
-      <Modal
-        visible={createModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setCreateModalVisible(false)}
-      >
-        <View className="flex-1 justify-end bg-black/40">
-          <View className="rounded-t-3xl bg-white p-6 shadow-xl">
-            <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
-              <Text className="text-base font-bold text-slate-900">
-                Generate Custom Audit Report
-              </Text>
-              <Pressable onPress={() => setCreateModalVisible(false)}>
-                <Ionicons name="close" size={22} color="#64748B" />
-              </Pressable>
-            </View>
-
-            <View className="mt-4">
-              <Text className="text-xs font-semibold text-slate-700 mb-1">
-                Report Title
-              </Text>
-              <TextInput
-                value={newTitle}
-                onChangeText={setNewTitle}
-                placeholder="e.g. Q3 Executive Circulation Audit"
-                placeholderTextColor="#94A3B8"
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900"
-              />
-            </View>
-
-            <View className="mt-3">
-              <Text className="text-xs font-semibold text-slate-700 mb-1">
-                Description / Notes
-              </Text>
-              <TextInput
-                value={newDescription}
-                onChangeText={setNewDescription}
-                placeholder="Enter scope, objectives or department focus..."
-                placeholderTextColor="#94A3B8"
-                multiline
-                numberOfLines={3}
-                className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900"
-                style={{ textAlignVertical: 'top' }}
-              />
-            </View>
+     {/* CRUD: Modal for Generating New Report */}
+<Modal
+  visible={createModalVisible}
+  transparent
+  animationType="slide"
+  onRequestClose={() => setCreateModalVisible(false)}
+>
+  <KeyboardAvoidingView
+    className="flex-1"
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+  >
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <View className="flex-1 justify-end bg-black/40">
+        <View className="rounded-t-3xl bg-white p-6 shadow-xl">
+          
+          <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
+            <Text className="text-base font-bold text-slate-900">
+              Generate Custom Audit Report
+            </Text>
 
             <Pressable
-              onPress={handleCreateReport}
-              disabled={submitting}
-              className="mt-5 flex-row items-center justify-center rounded-2xl bg-blue-950 py-3.5 shadow-sm active:opacity-90"
+              onPress={() => {
+                Keyboard.dismiss();
+                setCreateModalVisible(false);
+              }}
             >
-              {submitting ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <>
-                  <Ionicons name="sparkles" size={15} color="#FFFFFF" />
-                  <Text className="ml-2 text-xs font-bold text-white">
-                    Generate and Save
-                  </Text>
-                </>
-              )}
+              <Ionicons name="close" size={22} color="#64748B" />
             </Pressable>
           </View>
+
+          <View className="mt-4">
+            <Text className="text-xs font-semibold text-slate-700 mb-1">
+              Report Title
+            </Text>
+
+            <TextInput
+              value={newTitle}
+              onChangeText={setNewTitle}
+              placeholder="e.g. Q3 Executive Circulation Audit"
+              placeholderTextColor="#94A3B8"
+              returnKeyType="done"
+              onSubmitEditing={Keyboard.dismiss}
+              className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs text-slate-900"
+            />
+          </View>
+
+          <View className="mt-3">
+            <Text className="text-xs font-semibold text-slate-700 mb-1">
+              Description / Notes
+            </Text>
+
+            <TextInput
+              value={newDescription}
+              onChangeText={setNewDescription}
+              placeholder="Enter scope, objectives or department focus..."
+              placeholderTextColor="#94A3B8"
+              multiline
+              numberOfLines={3}
+              className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-900"
+              style={{ textAlignVertical: 'top' }}
+            />
+          </View>
+
+          <Pressable
+            onPress={() => {
+              Keyboard.dismiss();
+              handleCreateReport();
+            }}
+            disabled={submitting}
+            className="mt-5 flex-row items-center justify-center rounded-2xl bg-blue-950 py-3.5 shadow-sm active:opacity-90"
+          >
+            {submitting ? (
+              <ActivityIndicator color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="sparkles" size={15} color="#FFFFFF" />
+                <Text className="ml-2 text-xs font-bold text-white">
+                  Generate and Save
+                </Text>
+              </>
+            )}
+          </Pressable>
+
         </View>
-      </Modal>
+      </View>
+    </TouchableWithoutFeedback>
+  </KeyboardAvoidingView>
+</Modal>
 
       {/* Reusable Bottom Bar */}
       <ManagementBottomBar currentTab="overview" />
