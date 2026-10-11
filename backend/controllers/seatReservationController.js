@@ -243,7 +243,7 @@ async function validateSeatRequest({
  * Cancelled reservations never conflict — the unique index is partial on
  * status:"active" and the filter below matches that.
  */
-async function findConflictingSeats({ readingRoom, date, blocks, seatNumber }) {
+async function findConflictingSeats({ readingRoom, date, blocks, seatNumber, excludeId }) {
   const conflicts = await Reservation.find({
     readingRoom,
     date,
@@ -252,14 +252,15 @@ async function findConflictingSeats({ readingRoom, date, blocks, seatNumber }) {
     status: "active",
   });
 
-  return conflicts.length > 0;
+  return conflicts.some((record) => String(record._id) !== excludeId);
 }
 
 // Compare actual intervals, rather than equal strings: rooms may open at
 // different times, so 08:00-10:00 also conflicts with 09:00-11:00.
-async function hasStudentTimeConflict({ studentId, date, blocks }) {
+async function hasStudentTimeConflict({ studentId, date, blocks, excludeId }) {
   const existing = await Reservation.find({ studentId, date, status: "active" });
   return existing.some((reservation) => {
+    if (String(reservation._id) === excludeId) return false;
     const existingStart = blockStartMinutes(reservation.time);
     if (existingStart === null) return false;
     return blocks.some((block) => {
@@ -636,6 +637,67 @@ const getReservationById = async (req, res) => {
   }
 };
 
+function hasReservationStarted(reservation) {
+  const now = libraryClock();
+  const start = blockStartMinutes(reservation.time);
+  return reservation.date < now.date ||
+    (reservation.date === now.date && (start === null || start <= now.minutes));
+}
+
+// PATCH /api/seat-reservations/:id - one future block, within the same room.
+const updateReservation = async (req, res) => {
+  try {
+    const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) {
+      return res.status(400).json({ message: "Invalid reservation id" });
+    }
+    const studentId = req.user?.institutionalId;
+    if (!studentId) return res.status(401).json({ message: "Authentication required." });
+    const reservation = await Reservation.findById(id);
+    if (!reservation) return res.status(404).json({ message: "Reservation not found" });
+    if (reservation.studentId !== studentId) {
+      return res.status(403).json({ message: "This reservation belongs to another student" });
+    }
+    if (reservation.status !== "active" || hasReservationStarted(reservation)) {
+      return res.status(400).json({ message: "Only active reservations that have not started can be edited." });
+    }
+    const readingRoom = String(reservation.readingRoom);
+    if (req.body.readingRoom && req.body.readingRoom !== readingRoom) {
+      return res.status(400).json({ message: "To change rooms, cancel this reservation and book another room." });
+    }
+    const { date, time, seatNumber } = req.body;
+    const validation = await validateSeatRequest({ readingRoom, date, time, seatNumber });
+    if (validation.status) return res.status(validation.status).json({ message: validation.message });
+    const { blocks } = validation;
+    if (await hasStudentTimeConflict({ studentId, date, blocks, excludeId: id })) {
+      return res.status(409).json({ code: "STUDENT_TIME_CONFLICT", message: STUDENT_TIME_CONFLICT_MESSAGE });
+    }
+    if (await findConflictingSeats({ readingRoom, date, blocks, seatNumber, excludeId: id })) {
+      return res.status(409).json({ message: SEAT_TAKEN_MESSAGE });
+    }
+    if (hasReservationStarted(reservation) || hasReservationStarted({ date, time: blocks[0] })) {
+      return res.status(400).json({ message: "This time block has already started. Please refresh and choose a later block." });
+    }
+    await Reservation.init();
+    // One atomic update: validation failure/duplicate key leaves the old
+    // booking intact; concurrent cancellation or another edit cannot be lost.
+    const updated = await Reservation.findOneAndUpdate(
+      { _id: id, studentId, status: "active", date: reservation.date, time: reservation.time, seatNumber: reservation.seatNumber },
+      { $set: { date, time: blocks[0], seatNumber, occupiedMinutes: occupiedMinutesFor(blocks[0]) } },
+      { returnDocument: "after", runValidators: true }
+    );
+    if (!updated) return res.status(409).json({ message: "This reservation changed. Please reopen it and try again." });
+    return res.status(200).json({ message: "Reservation updated", _id: String(updated._id), reservation: updated });
+  } catch (error) {
+    if (error?.code === 11000) {
+      return res.status(409).json(isStudentTimeIndexConflict(error)
+        ? { code: "STUDENT_TIME_CONFLICT", message: STUDENT_TIME_CONFLICT_MESSAGE }
+        : { message: SEAT_TAKEN_MESSAGE });
+    }
+    return res.status(500).json({ message: "Could not update the reservation. Your original booking is unchanged." });
+  }
+};
+
 // PATCH /api/seat-reservations/:id/cancel
 // ?studentId=... enforces ownership; the seat is freed for other students
 // because the unique index only covers status:"active".
@@ -703,4 +765,5 @@ module.exports = {
   getReservations,
   getReservationById,
   cancelReservation,
+  updateReservation,
 };
