@@ -38,7 +38,6 @@ export default function BookUsageScreen() {
   const [data, setData] = useState<BookUsageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<'Weekly' | 'Monthly' | 'Semester'>('Monthly');
 
   const loadData = useCallback(async () => {
     try {
@@ -280,28 +279,13 @@ export default function BookUsageScreen() {
               </Text>
             </View>
 
-            {/* Tabs: Weekly, Monthly, Semester */}
+            {/* Monthly reporting period */}
             <View className="mt-3 flex-row rounded-xl bg-slate-100 p-1">
-              {(['Weekly', 'Monthly', 'Semester'] as const).map((tab) => {
-                const active = selectedFilter === tab;
-                return (
-                  <Pressable
-                    key={tab}
-                    onPress={() => setSelectedFilter(tab)}
-                    className={`flex-1 items-center rounded-lg py-1.5 ${
-                      active ? 'bg-white shadow-sm' : ''
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs ${
-                        active ? 'font-bold text-blue-950' : 'text-slate-500'
-                      }`}
-                    >
-                      {tab}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+              <View className="flex-1 items-center rounded-lg bg-white py-1.5 shadow-sm">
+                <Text className="text-xs font-bold text-blue-950">
+                  Monthly
+                </Text>
+              </View>
             </View>
 
             {/* Dropdown Selector */}

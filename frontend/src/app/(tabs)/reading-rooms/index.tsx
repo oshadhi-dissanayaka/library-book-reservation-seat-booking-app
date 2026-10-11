@@ -19,6 +19,7 @@ import {
  */
 
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
+import { getLibraryClock } from '@/lib/library-time';
 
 type ReadingRoom = {
   _id: string;
@@ -37,11 +38,11 @@ const MONTH_NAMES = [
 ];
 
 function formatDateIso(date: Date): string {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
 }
 
 function formatDateLong(date: Date): string {
-  return `${String(date.getDate()).padStart(2, '0')} ${MONTH_NAMES[date.getMonth()]} ${date.getFullYear()}`;
+  return `${String(date.getUTCDate()).padStart(2, '0')} ${MONTH_NAMES[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
 function formatTime(value: string): string {
@@ -54,14 +55,13 @@ function formatTime(value: string): string {
 }
 
 const DATE_OPTIONS = Array.from({ length: 7 }, (_, index) => {
-  const date = new Date();
-  date.setHours(12, 0, 0, 0);
-  date.setDate(date.getDate() + index);
+  const date = new Date(`${getLibraryClock().date}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + index);
   return {
     iso: formatDateIso(date),
     label: formatDateLong(date),
-    dayName: index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : date.toLocaleDateString('en-GB', { weekday: 'short' }),
-    dayNum: String(date.getDate()),
+    dayName: index === 0 ? 'Today' : index === 1 ? 'Tomorrow' : date.toLocaleDateString('en-GB', { weekday: 'short', timeZone: 'UTC' }),
+    dayNum: String(date.getUTCDate()),
   };
 });
 

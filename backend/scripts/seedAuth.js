@@ -2,6 +2,7 @@
  * Idempotent authentication seed.
  *
  *   node scripts/seedAuth.js      (or: npm run seed:auth)
+ *   node scripts/seedAuth.js --identities-only  (no login accounts created)
  *
  * What it does:
  *   1. ApprovedIdentity entries for the approved students + academic staff
@@ -57,6 +58,110 @@ const APPROVED_IDENTITIES = [
     institutionalId: "AC002",
     email: "academic2@sliit.lk",
     name: "Academic Staff 002",
+    role: "academic_staff",
+  },
+  // Fictional university-directory records for viva signup demonstrations.
+  // These are approved identities only; each person still needs to sign up.
+  {
+    institutionalId: "IT23846100",
+    email: "kasun.perera@sliit.lk",
+    name: "Kasun Perera",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846101",
+    email: "nipuni.silva@sliit.lk",
+    name: "Nipuni Silva",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846102",
+    email: "tharindu.jayasinghe@sliit.lk",
+    name: "Tharindu Jayasinghe",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846103",
+    email: "dilini.fernando@sliit.lk",
+    name: "Dilini Fernando",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846104",
+    email: "chamod.wijesinghe@sliit.lk",
+    name: "Chamod Wijesinghe",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846105",
+    email: "kavindi.rathnayake@sliit.lk",
+    name: "Kavindi Rathnayake",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846106",
+    email: "pasindu.dissanayake@sliit.lk",
+    name: "Pasindu Dissanayake",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846107",
+    email: "sanduni.gunawardena@sliit.lk",
+    name: "Sanduni Gunawardena",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846108",
+    email: "ravindu.bandara@sliit.lk",
+    name: "Ravindu Bandara",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846109",
+    email: "imesha.ekanayake@sliit.lk",
+    name: "Imesha Ekanayake",
+    role: "student",
+  },
+  {
+    institutionalId: "IT23846110",
+    email: "lahiru.samarasinghe@sliit.lk",
+    name: "Lahiru Samarasinghe",
+    role: "student",
+  },
+  {
+    institutionalId: "AC010",
+    email: "nuwan.abeysekera@sliit.lk",
+    name: "Nuwan Abeysekera",
+    role: "academic_staff",
+  },
+  {
+    institutionalId: "AC011",
+    email: "ishara.wickramasinghe@sliit.lk",
+    name: "Ishara Wickramasinghe",
+    role: "academic_staff",
+  },
+  {
+    institutionalId: "AC012",
+    email: "sachith.karunaratne@sliit.lk",
+    name: "Sachith Karunaratne",
+    role: "academic_staff",
+  },
+  {
+    institutionalId: "AC013",
+    email: "anupama.senanayake@sliit.lk",
+    name: "Anupama Senanayake",
+    role: "academic_staff",
+  },
+  {
+    institutionalId: "AC014",
+    email: "roshan.amarasinghe@sliit.lk",
+    name: "Roshan Amarasinghe",
+    role: "academic_staff",
+  },
+  {
+    institutionalId: "AC015",
+    email: "shashini.weerasinghe@sliit.lk",
+    name: "Shashini Weerasinghe",
     role: "academic_staff",
   },
 ];
@@ -141,7 +246,9 @@ async function main() {
   console.log("MongoDB connected.");
 
   await seedApprovedIdentities();
-  await seedAccounts();
+  if (!process.argv.includes("--identities-only")) {
+    await seedAccounts();
+  }
 
   console.log("Auth seed complete.");
 }

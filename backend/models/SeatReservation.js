@@ -45,6 +45,15 @@ const seatReservationSchema = new mongoose.Schema(
       default: "demo-student",
       trim: true,
     },
+
+    // Internal minute claims make overlapping bookings unique across rooms,
+    // including rooms whose two-hour blocks start at different times.
+    // Legacy records remain readable and are checked by the controller.
+    occupiedMinutes: {
+      type: [Number],
+      default: undefined,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -60,6 +69,17 @@ seatReservationSchema.index(
     unique: true,
     name: "uniq_active_seat_per_slot",
     partialFilterExpression: { status: "active" },
+  }
+);
+
+// A student may own only one active seat during any minute on a given day.
+// Exclude legacy rows so deploying the index never rewrites old reservations.
+seatReservationSchema.index(
+  { studentId: 1, date: 1, occupiedMinutes: 1 },
+  {
+    unique: true,
+    name: "uniq_active_student_minute",
+    partialFilterExpression: { status: "active", occupiedMinutes: { $exists: true } },
   }
 );
 

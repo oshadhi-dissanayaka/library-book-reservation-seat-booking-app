@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -22,6 +23,7 @@ import {
 
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
 import { currentStudentId } from '@/lib/student-identity';
+import { hasTimeBlockStarted } from '@/lib/library-time';
 import { SeatLegend } from '@/components/m2';
 
 type ReadingRoom = {
@@ -149,8 +151,27 @@ export default function SeatAvailabilityScreen() {
   const [occupancyLoading, setOccupancyLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reserveError, setReserveError] = useState('');
+  const [clockNow, setClockNow] = useState(() => new Date());
 
   const isoDate = isoDateParam ?? (date ? toIsoDate(date) : null);
+
+  // Expire selections while the page stays open and when the app resumes.
+  useEffect(() => {
+    const refresh = () => {
+      const now = new Date();
+      setClockNow(now);
+      if (isoDate && selectedTimes.some((block) => hasTimeBlockStarted(isoDate, block, now))) {
+        setSelectedTimes([]);
+        setSelectedSeat(null);
+        setReserveError('Your selected time has already started. Please choose a later block.');
+      }
+    };
+    const interval = setInterval(refresh, 15000);
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refresh();
+    });
+    return () => { clearInterval(interval); subscription.remove(); };
+  }, [isoDate, selectedTimes]);
 
   // Responsive seat dimensions
   const COLS = width < 360 ? 5 : 6;
@@ -225,6 +246,7 @@ export default function SeatAvailabilityScreen() {
   }, [id, isoDate, selectedTimes]);
 
   const toggleTimeBlock = (block: string) => {
+    if (!isoDate || hasTimeBlockStarted(isoDate, block)) return;
     const blockIndex = timeBlocks.indexOf(block);
     const selectedIndex = selectedTimes.indexOf(block);
     setSelectedSeat(null);
@@ -259,6 +281,12 @@ export default function SeatAvailabilityScreen() {
 
   const handleReserve = async () => {
     if (selectedSeat === null || !room || !isoDate || selectedTimes.length === 0 || saving) return;
+    if (selectedTimes.some((block) => hasTimeBlockStarted(isoDate, block))) {
+      setSelectedTimes([]);
+      setSelectedSeat(null);
+      setReserveError('This time block has already started. Please choose a later block.');
+      return;
+    }
     setSaving(true);
     setReserveError('');
     try {
@@ -371,13 +399,14 @@ export default function SeatAvailabilityScreen() {
                           ? timeBlocks.indexOf(selectedTimes[selectedTimes.length - 1])
                           : -1;
                       const isNextAdjacent = selectedTimes.length > 0 && blockIndex === lastSelectedIndex + 1;
-                      const isDisabled = selectedTimes.length > 0 && !isSelected && !isNextAdjacent;
+                      const hasStarted = !isoDate || hasTimeBlockStarted(isoDate, block, clockNow);
+                      const isDisabled = hasStarted || (selectedTimes.length > 0 && !isSelected && !isNextAdjacent);
                       return (
                         <Pressable
                           key={block}
                           disabled={isDisabled}
                           accessibilityRole="button"
-                          accessibilityLabel={`Time block ${block}, ${isSelected ? 'selected' : isNextAdjacent || selectedTimes.length === 0 ? 'available' : 'unavailable until adjacent blocks are selected'}`}
+                          accessibilityLabel={`Time block ${block}, ${hasStarted ? 'already started, unavailable' : isSelected ? 'selected' : isNextAdjacent || selectedTimes.length === 0 ? 'available' : 'unavailable until adjacent blocks are selected'}`}
                           accessibilityState={{ selected: isSelected, disabled: isDisabled }}
                           style={[
                             styles.timeChip,
@@ -394,8 +423,9 @@ export default function SeatAvailabilityScreen() {
                             ]}>
                             {block}
                           </Text>
-                          {isSelected && <Text style={styles.timeChipCheck}>{'\u2713'}</Text>}
-                          {isNextAdjacent && !isSelected && <Text style={styles.timeChipPlus}>+</Text>}
+                          {hasStarted && <Text style={styles.timeChipDisabledText}>Unavailable</Text>}
+                          {isSelected && !hasStarted && <Text style={styles.timeChipCheck}>{'\u2713'}</Text>}
+                          {isNextAdjacent && !isSelected && !hasStarted && <Text style={styles.timeChipPlus}>+</Text>}
                         </Pressable>
                       );
                     })}
@@ -414,7 +444,8 @@ export default function SeatAvailabilityScreen() {
               </View>
             )}
             <Text style={styles.timeHelpText}>
-              Select any starting block, then add the next adjacent block. Tap a selected block to remove it and every later block.
+              Times are in Sri Lankan time. Blocks that have already started cannot be booked.
+              {'\n'}Select a starting block, then add the next adjacent block. Tap a selected block to remove it and every later block.
             </Text>
           </View>
 
