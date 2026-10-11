@@ -19,6 +19,15 @@ function controllerAt(instant, existing = [], options = {}) {
   }
   const reservationModel = {
     init: async () => {},
+    findById: async (id) => existing.find((record) => record._id === id),
+    findOneAndUpdate: async (filter, update) => {
+      if (options.updateError) throw options.updateError;
+      if (options.concurrentChange) return null;
+      const record = existing.find((item) => Object.entries(filter).every(([key, value]) => item[key] === value));
+      if (!record) return null;
+      Object.assign(record, update.$set);
+      return record;
+    },
     find: async (filter) => [...existing, ...writes].filter((record) =>
       Object.entries(filter).every(([key, value]) =>
         key === 'time' ? value.$in.includes(record.time) : record[key] === value
@@ -195,4 +204,67 @@ test('a batch database race rolls back its earlier successful insert', async () 
   assert.equal(result.status, 409);
   assert.equal(result.body.code, 'STUDENT_TIME_CONFLICT');
   assert.equal(result.writes.length, 0);
+});
+
+
+async function edit(options = {}) {
+  const original = { _id: '0123456789abcdef01234568', studentId: 'test-student', readingRoom: '0123456789abcdef01234567', date: '2026-10-12', time: morning, seatNumber: 1, status: 'active', createdAt: '2026-10-10T00:00:00Z', ...options.original };
+  const before = JSON.stringify(original);
+  const { controller } = controllerAt('2026-10-11T05:37:00Z', [original, ...(options.existing ?? [])], options.modelOptions);
+  let status, body;
+  const res = { status(value) { status = value; return this; }, json(value) { body = value; return this; } };
+  await controller.updateReservation({ params: { id: original._id }, user: options.noUser ? undefined : { institutionalId: options.owner ?? 'test-student' }, body: { date: '2026-10-13', time: lateMorning, seatNumber: 2, ...options.body } }, res);
+  if (status !== 200) assert.equal(JSON.stringify(original), before, 'A failed edit must preserve the original booking');
+  return { status, body, original };
+}
+
+test('edit changes date, time and seat while preserving owner, reference and creation date', async () => {
+  const result = await edit();
+  assert.equal(result.status, 200);
+  assert.equal(result.original.date, '2026-10-13');
+  assert.equal(result.original.time, lateMorning);
+  assert.equal(result.original.seatNumber, 2);
+  assert.equal(result.original.occupiedMinutes.length, 120);
+  assert.equal(result.original.studentId, 'test-student');
+  assert.equal(result.body._id, '0123456789abcdef01234568');
+  assert.equal(result.original.createdAt, '2026-10-10T00:00:00Z');
+});
+
+test('edit excludes itself from seat and student conflicts', async () => {
+  assert.equal((await edit({ body: { date: '2026-10-12', time: morning, seatNumber: 1 } })).status, 200);
+});
+
+test('edit requires authenticated owner and ignores a forged body identity', async () => {
+  assert.equal((await edit({ noUser: true })).status, 401);
+  assert.equal((await edit({ owner: 'someone-else', body: { studentId: 'test-student' } })).status, 403);
+});
+
+test('cancelled or already started reservations cannot be edited', async () => {
+  assert.equal((await edit({ original: { status: 'cancelled' } })).status, 400);
+  assert.equal((await edit({ original: { date: '2026-10-11' } })).status, 400);
+});
+
+test('edit rejects room changes, expired target blocks and multiple blocks', async () => {
+  assert.equal((await edit({ body: { readingRoom: 'another-room' } })).status, 400);
+  assert.equal((await edit({ body: { date: '2026-10-11', time: morning } })).status, 400);
+  assert.equal((await edit({ body: { time: [morning, lateMorning] } })).status, 400);
+});
+
+test('edit rejects overlapping bookings in both the same room and another room', async () => {
+  for (const readingRoom of ['0123456789abcdef01234567', 'another-room']) {
+    const result = await edit({ existing: [{ _id: 'other', studentId: 'test-student', readingRoom, date: '2026-10-13', time: lateMorning, seatNumber: 3, status: 'active' }] });
+    assert.equal(result.status, 409);
+    assert.equal(result.body.code, 'STUDENT_TIME_CONFLICT');
+  }
+});
+
+test('edit cannot take an occupied seat belonging to another person', async () => {
+  const result = await edit({ existing: [{ _id: 'other', studentId: 'another-student', readingRoom: '0123456789abcdef01234567', date: '2026-10-13', time: lateMorning, seatNumber: 2, status: 'active' }] });
+  assert.equal(result.status, 409);
+});
+
+test('edit handles database conflict, concurrent change and write failure without losing the original', async () => {
+  assert.equal((await edit({ modelOptions: { updateError: { code: 11000, keyPattern: { studentId: 1, date: 1, occupiedMinutes: 1 } } } })).status, 409);
+  assert.equal((await edit({ modelOptions: { concurrentChange: true } })).status, 409);
+  assert.equal((await edit({ modelOptions: { updateError: new Error('write failed') } })).status, 500);
 });

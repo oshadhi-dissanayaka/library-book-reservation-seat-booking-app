@@ -6,9 +6,11 @@ const {
   getReservations,
   getReservationById,
   cancelReservation,
+  updateReservation,
 } = require("../controllers/seatReservationController");
 
 const router = express.Router();
+const { requireAuth, requireRole } = require("../middleware/auth");
 
 // POST /api/seat-reservations
 router.post("/", createReservation);
@@ -25,6 +27,8 @@ router.get("/", getReservations);
 
 // GET /api/seat-reservations/:id — single persisted reservation (WF-12/14)
 router.get("/:id", getReservationById);
+
+router.patch("/:id", requireAuth, requireRole("student", "academic_staff"), updateReservation);
 
 // PATCH /api/seat-reservations/:id/cancel — cancel an active reservation (WF-14)
 router.patch("/:id/cancel", cancelReservation);

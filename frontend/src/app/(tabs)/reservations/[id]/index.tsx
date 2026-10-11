@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   ActivityIndicator,
   Modal,
@@ -22,6 +22,7 @@ import {
 
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
 import { currentStudentId, studentIdQuery } from '@/lib/student-identity';
+import { hasTimeBlockStarted } from '@/lib/library-time';
 import { ReservationStatusBadge, M2InfoRow } from '@/components/m2';
 
 type Reservation = {
@@ -184,6 +185,7 @@ export default function ReservationDetailsScreen() {
   const status = reservation?.status ?? 'active';
   const statusIsCancelled = status !== 'active';
   const canCancel = Boolean(reservation) && reservation?.status === 'active' && !cancelling;
+  const canEdit = reservation?.status === 'active' && !hasTimeBlockStarted(reservation.date, reservation.time);
 
   return (
     <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
@@ -239,6 +241,19 @@ export default function ReservationDetailsScreen() {
             <M2InfoRow label="Reference" value={confirmationCodeFor(reservation._id)} accent />
             <M2InfoRow label="Booked on" value={formatCreated(reservation.createdAt)} />
           </View>
+
+          {canEdit && (
+            <Pressable
+              accessibilityRole="button"
+              disabled={cancelling}
+              style={[styles.modalKeepButton, cancelling && styles.cancelButtonDisabled]}
+              onPress={() => router.push({
+                pathname: '/reading-rooms/[id]/seats',
+                params: { id: reservation.readingRoom, editReservationId: reservation._id, isoDate: reservation.date, date: formatIsoDate(reservation.date) },
+              })}>
+              <Text style={styles.modalKeepText}>Edit Reservation</Text>
+            </Pressable>
+          )}
 
           {/* Cancel section - only for active reservations */}
           {!statusIsCancelled && (

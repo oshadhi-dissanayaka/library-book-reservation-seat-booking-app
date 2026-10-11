@@ -22,8 +22,9 @@ import {
  */
 
 import { API_ORIGIN as API_BASE_URL } from '@/lib/api';
-import { currentStudentId } from '@/lib/student-identity';
-import { hasTimeBlockStarted } from '@/lib/library-time';
+import { currentStudentId, studentIdQuery } from '@/lib/student-identity';
+import { authHeaders } from '@/lib/auth-session';
+import { getLibraryClock, hasTimeBlockStarted } from '@/lib/library-time';
 import { SeatLegend } from '@/components/m2';
 
 type ReadingRoom = {
@@ -59,6 +60,11 @@ const MONTH_NAMES = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+function formatDate(value: string): string {
+  const [year, month, day] = value.split('-');
+  return `${Number(day)} ${MONTH_NAMES[Number(month) - 1]} ${year}`;
+}
 
 function toIsoDate(label: string): string | null {
   const parts = label.split(' ');
@@ -109,7 +115,8 @@ function formatContinuousRange(blocks: string[]): string {
 async function fetchOccupiedSeatsForBlocks(
   roomId: string,
   isoDate: string,
-  blocks: string[]
+  blocks: string[],
+  excludeId?: string
 ): Promise<number[]> {
   const reservationLists = await Promise.all(
     blocks.map(async (block) => {
@@ -126,17 +133,18 @@ async function fetchOccupiedSeatsForBlocks(
     ...new Set(
       reservationLists
         .flat()
-        .filter((reservation) => reservation.status === 'active')
+        .filter((reservation) => reservation.status === 'active' && reservation._id !== excludeId)
         .map((reservation) => reservation.seatNumber)
     ),
   ];
 }
 
 export default function SeatAvailabilityScreen() {
-  const { id, date, isoDate: isoDateParam } = useLocalSearchParams<{
+  const { id, date, isoDate: isoDateParam, editReservationId } = useLocalSearchParams<{
     id?: string;
     date?: string;
     isoDate?: string;
+    editReservationId?: string;
   }>();
 
   const { width } = useWindowDimensions();
@@ -153,7 +161,17 @@ export default function SeatAvailabilityScreen() {
   const [reserveError, setReserveError] = useState('');
   const [clockNow, setClockNow] = useState(() => new Date());
 
-  const isoDate = isoDateParam ?? (date ? toIsoDate(date) : null);
+  const [editDate, setEditDate] = useState<string | null>(null);
+  const [original, setOriginal] = useState<ReservationSummary | null>(null);
+  const isoDate = editDate ?? isoDateParam ?? (date ? toIsoDate(date) : null);
+  const displayDate = editReservationId && isoDate ? formatDate(isoDate) : date;
+  const today = getLibraryClock(clockNow).date;
+  const editDates = Array.from({ length: 7 }, (_, offset) => {
+    const day = new Date(today + 'T12:00:00Z');
+    day.setUTCDate(day.getUTCDate() + offset);
+    return day.toISOString().slice(0, 10);
+  });
+  if (original && !editDates.includes(original.date)) editDates.push(original.date);
 
   // Expire selections while the page stays open and when the app resumes.
   useEffect(() => {
@@ -201,7 +219,21 @@ export default function SeatAvailabilityScreen() {
         const blocks = buildTimeBlocks(found.openingTime, found.closingTime);
         setRoom(found);
         setTimeBlocks(blocks);
-        setSelectedTimes([]);
+        if (editReservationId) {
+          const response = await fetch(`${API_BASE_URL}/api/seat-reservations/${encodeURIComponent(editReservationId)}?${studentIdQuery()}`);
+          const data = await response.json();
+          const existing = data.reservation as ReservationSummary | undefined;
+          if (!response.ok || !existing) throw new Error(data.message ?? 'Reservation not found.');
+          if (existing.readingRoom !== id || existing.status !== 'active' || hasTimeBlockStarted(existing.date, existing.time)) {
+            throw new Error('Only active reservations that have not started can be edited.');
+          }
+          if (!active) return;
+          setOriginal(existing);
+          setEditDate(existing.date);
+          setSelectedTimes([existing.time]);
+        } else {
+          setSelectedTimes([]);
+        }
         setOccupancyLoading(false);
       } catch (requestError) {
         if (!active) return;
@@ -214,7 +246,7 @@ export default function SeatAvailabilityScreen() {
     loadRoom();
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, editReservationId]);
 
   useEffect(() => {
     let active = true;
@@ -231,8 +263,13 @@ export default function SeatAvailabilityScreen() {
       setSelectedSeat(null);
       setReserveError('');
       try {
-        const taken = await fetchOccupiedSeatsForBlocks(id, isoDate, selectedTimes);
-        if (active) setReservedSeats(taken);
+        const taken = await fetchOccupiedSeatsForBlocks(id, isoDate, selectedTimes, editReservationId);
+        if (active) {
+          setReservedSeats(taken);
+          if (original && isoDate === original.date && selectedTimes.length === 1 && selectedTimes[0] === original.time && !taken.includes(original.seatNumber)) {
+            setSelectedSeat(original.seatNumber);
+          }
+        }
       } catch (requestError) {
         if (!active) return;
         const detail = requestError instanceof Error ? requestError.message : 'Unknown error';
@@ -243,7 +280,7 @@ export default function SeatAvailabilityScreen() {
     };
     loadOccupancy();
     return () => { active = false; };
-  }, [id, isoDate, selectedTimes]);
+  }, [id, isoDate, selectedTimes, editReservationId, original]);
 
   const toggleTimeBlock = (block: string) => {
     if (!isoDate || hasTimeBlockStarted(isoDate, block)) return;
@@ -252,6 +289,11 @@ export default function SeatAvailabilityScreen() {
     setSelectedSeat(null);
     setReservedSeats([]);
     setReserveError('');
+    if (editReservationId) {
+      setSelectedTimes(selectedIndex >= 0 ? [] : [block]);
+      setOccupancyLoading(selectedIndex < 0);
+      return;
+    }
     if (selectedIndex >= 0) {
       setOccupancyLoading(selectedIndex > 0);
       setSelectedTimes((current) => current.slice(0, selectedIndex));
@@ -290,7 +332,7 @@ export default function SeatAvailabilityScreen() {
     setSaving(true);
     setReserveError('');
     try {
-      const latestOccupiedSeats = await fetchOccupiedSeatsForBlocks(room._id, isoDate, selectedTimes);
+      const latestOccupiedSeats = await fetchOccupiedSeatsForBlocks(room._id, isoDate, selectedTimes, editReservationId);
       if (latestOccupiedSeats.includes(selectedSeat)) {
         setReserveError('This seat is no longer available for the selected time. Please choose another seat or time block.');
         setReservedSeats(latestOccupiedSeats);
@@ -298,12 +340,14 @@ export default function SeatAvailabilityScreen() {
         return;
       }
       const isBatch = selectedTimes.length > 1;
-      const endpoint = isBatch
+      const endpoint = editReservationId
+        ? `${API_BASE_URL}/api/seat-reservations/${encodeURIComponent(editReservationId)}`
+        : isBatch
         ? `${API_BASE_URL}/api/seat-reservations/batch`
         : `${API_BASE_URL}/api/seat-reservations`;
       const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: editReservationId ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json', ...(editReservationId ? authHeaders() : {}) },
         body: JSON.stringify({
           studentId: currentStudentId(),
           readingRoom: room._id,
@@ -317,12 +361,16 @@ export default function SeatAvailabilityScreen() {
       if (response.status === 409) {
         setSelectedSeat(null);
         setReserveError(data?.message ?? 'One or more selected time blocks are no longer available. Please choose another time.');
-        const refreshed = await fetchOccupiedSeatsForBlocks(room._id, isoDate, selectedTimes).catch(() => null);
+        const refreshed = await fetchOccupiedSeatsForBlocks(room._id, isoDate, selectedTimes, editReservationId).catch(() => null);
         if (refreshed) setReservedSeats(refreshed);
         return;
       }
       if (!response.ok || !data || !data._id) {
         throw new Error(data?.message ?? `Server responded with status ${response.status}`);
+      }
+      if (editReservationId) {
+        router.back();
+        return;
       }
       router.push({
         pathname: '/reservations/[id]/confirmation',
@@ -374,9 +422,25 @@ export default function SeatAvailabilityScreen() {
             </View>
             <View style={styles.roomBannerRight}>
               <Text style={styles.roomBannerDateLabel}>Date</Text>
-              <Text style={styles.roomBannerDate}>{date || 'Not set'}</Text>
+              <Text style={styles.roomBannerDate}>{displayDate || 'Not set'}</Text>
             </View>
           </View>
+
+          {editReservationId && (
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Edit Reservation</Text>
+              <Text style={styles.timeHelpText}>Change the date, one 2-hour time block, or seat in this room. Your original booking stays until you save.</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {editDates.sort().map((day) => (
+                  <Pressable key={day} accessibilityRole="button" accessibilityState={{ selected: day === isoDate }}
+                    style={[styles.timeChip, { flex: 0, minWidth: 150, marginRight: 8, marginTop: 12 }, day === isoDate && styles.timeChipSelected]}
+                    onPress={() => { setEditDate(day); setSelectedTimes([]); setSelectedSeat(null); setReserveError(''); }}>
+                    <Text style={[styles.timeChipText, day === isoDate && styles.timeChipSelectedText]}>{formatDate(day)}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           {/* Time block selector */}
           <View style={styles.card}>
@@ -398,15 +462,15 @@ export default function SeatAvailabilityScreen() {
                         selectedTimes.length > 0
                           ? timeBlocks.indexOf(selectedTimes[selectedTimes.length - 1])
                           : -1;
-                      const isNextAdjacent = selectedTimes.length > 0 && blockIndex === lastSelectedIndex + 1;
+                      const isNextAdjacent = !editReservationId && selectedTimes.length > 0 && blockIndex === lastSelectedIndex + 1;
                       const hasStarted = !isoDate || hasTimeBlockStarted(isoDate, block, clockNow);
-                      const isDisabled = hasStarted || (selectedTimes.length > 0 && !isSelected && !isNextAdjacent);
+                      const isDisabled = hasStarted || (!editReservationId && selectedTimes.length > 0 && !isSelected && !isNextAdjacent);
                       return (
                         <Pressable
                           key={block}
                           disabled={isDisabled}
                           accessibilityRole="button"
-                          accessibilityLabel={`Time block ${block}, ${hasStarted ? 'already started, unavailable' : isSelected ? 'selected' : isNextAdjacent || selectedTimes.length === 0 ? 'available' : 'unavailable until adjacent blocks are selected'}`}
+                          accessibilityLabel={`Time block ${block}, ${hasStarted ? 'already started, unavailable' : isSelected ? 'selected' : editReservationId || isNextAdjacent || selectedTimes.length === 0 ? 'available' : 'unavailable until adjacent blocks are selected'}`}
                           accessibilityState={{ selected: isSelected, disabled: isDisabled }}
                           style={[
                             styles.timeChip,
@@ -445,7 +509,7 @@ export default function SeatAvailabilityScreen() {
             )}
             <Text style={styles.timeHelpText}>
               Times are in Sri Lankan time. Blocks that have already started cannot be booked.
-              {'\n'}Select a starting block, then add the next adjacent block. Tap a selected block to remove it and every later block.
+              {'\n'}{editReservationId ? 'Choose one time block for this reservation.' : 'Select a starting block, then add the next adjacent block. Tap a selected block to remove it and every later block.'}
             </Text>
           </View>
 
@@ -532,7 +596,7 @@ export default function SeatAvailabilityScreen() {
                     </View>
                     <View style={styles.bookingSummaryRow}>
                       <Text style={styles.bookingSummaryLabel}>Date</Text>
-                      <Text style={styles.bookingSummaryValue}>{date || 'Not selected'}</Text>
+                      <Text style={styles.bookingSummaryValue}>{displayDate || 'Not selected'}</Text>
                     </View>
                     <View style={styles.bookingSummaryRow}>
                       <Text style={styles.bookingSummaryLabel}>Time</Text>
@@ -550,7 +614,7 @@ export default function SeatAvailabilityScreen() {
                 {/* Reserve button */}
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel={`Reserve seat for ${selectedTimes.length} time block${selectedTimes.length === 1 ? '' : 's'}`}
+                  accessibilityLabel={editReservationId ? 'Save reservation changes' : `Reserve seat for ${selectedTimes.length} time block${selectedTimes.length === 1 ? '' : 's'}`}
                   disabled={selectedSeat === null || saving}
                   style={[
                     styles.reserveButton,
@@ -560,9 +624,9 @@ export default function SeatAvailabilityScreen() {
                   {saving && <ActivityIndicator size="small" color="#FFFFFF" />}
                   <Text style={styles.reserveButtonText}>
                     {saving
-                      ? 'Reserving...'
+                      ? editReservationId ? 'Saving...' : 'Reserving...'
                       : selectedSeat !== null
-                        ? `Reserve Seat ${selectedSeat}`
+                        ? editReservationId ? 'Save Changes' : `Reserve Seat ${selectedSeat}`
                         : 'Select a Seat First'}
                   </Text>
                 </Pressable>
