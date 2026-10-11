@@ -3,7 +3,14 @@ const Reservation = require("../models/Reservation");
 const ReadingRoom = require("../models/ReadingRoom");
 const Seat = require("../models/Seat");
 const SeatReservation = require("../models/SeatReservation");
+const ManagementReport = require('../models/ManagementReport');
+const UserAccount = require("../models/UserAccount");
 
+const {
+  hashPassword,
+  passwordPolicyError,
+  generateTemporaryPassword,
+} = require("./authController");
 /**
  * Executive Management Dashboard Overview
  * GET /api/management/dashboard
@@ -396,10 +403,28 @@ let cachedReports = [
  */
 const getManagementReports = async (req, res) => {
   try {
+    const mongoReports = await ManagementReport.find()
+      .sort({ createdAt: -1 })
+      .lean();
+
+    const formattedMongoReports = mongoReports.map((report) => ({
+      id: report._id.toString(),
+      title: report.title,
+      type: report.type,
+      period: report.period,
+      updatedDate: report.updatedAt
+        ? new Date(report.updatedAt).toLocaleDateString()
+        : "Today",
+      fileSize: report.fileSize,
+      status: report.status,
+      description: report.description,
+      audited: report.audited,
+    }));
+
     const reportsData = {
       period: "September 2026",
       generatedAt: new Date().toISOString(),
-      reports: cachedReports,
+      reports: [...formattedMongoReports, ...cachedReports],
     };
 
     res.status(200).json(reportsData);
@@ -418,66 +443,98 @@ const getManagementReports = async (req, res) => {
 const createManagementReport = async (req, res) => {
   try {
     const { title, description, period } = req.body;
-    if (!title) {
-      return res.status(400).json({ message: "Report title is required." });
+
+    if (!title || !title.trim()) {
+      return res.status(400).json({
+        message: "Report title is required.",
+      });
     }
 
-    const newReport = {
-      id: `rep-${Date.now()}`,
+    const report = await ManagementReport.create({
       title: title.trim(),
-      type: "custom",
+      description:
+        description ||
+        "Executive management evaluation and internal audit report.",
       period: period || "September 2026",
-      updatedDate: "Today",
-      fileSize: "1.2 MB",
+      type: "custom",
       status: "Ready to review",
-      description: description || "Executive management evaluation and internal audit report.",
+      fileSize: "1.2 MB",
       audited: false,
-      summary: `Internal university audit report compiled for ${title}. Initial data collected across active catalog databases and operational logs.`,
-      keyMetrics: [
-        { label: "Dataset Scope", value: "University Wide" },
-        { label: "Audit Status", value: "Pending Review" },
-        { label: "Integrity Verification", value: "100% Passed" },
-      ],
-      signOff: "Library Executive Council",
-      certId: `CERT-GEN-${Date.now().toString().slice(-4)}`,
+    });
+
+    const formattedReport = {
+      id: report._id.toString(),
+      title: report.title,
+      type: report.type,
+      period: report.period,
+      updatedDate: "Today",
+      fileSize: report.fileSize,
+      status: report.status,
+      description: report.description,
+      audited: report.audited,
     };
 
-    cachedReports.unshift(newReport);
-    res.status(201).json({ message: "Report generated successfully", report: newReport });
+    return res.status(201).json({
+      message: "Report generated successfully",
+      report: formattedReport,
+    });
   } catch (error) {
-    res.status(500).json({ message: "Failed to create report", error: error.message });
+    return res.status(500).json({
+      message: "Failed to create report",
+      error: error.message,
+    });
   }
 };
 
-/**
- * Update Management Report Status (CRUD Update)
- * PUT /api/management/reports/:id
- */
+
+
+
 const updateManagementReport = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const reportIndex = cachedReports.findIndex((r) => r.id === id);
 
-    if (reportIndex === -1) {
-      return res.status(404).json({ message: "Report not found." });
+    const report = await ManagementReport.findByIdAndUpdate(
+      id,
+      {
+        status,
+        audited: status === "Audited & Verified",
+      },
+      {
+        new: true,
+        runValidators: true,
+      }
+    );
+
+    if (!report) {
+      return res.status(404).json({
+        message: "Report not found.",
+      });
     }
 
-    cachedReports[reportIndex] = {
-      ...cachedReports[reportIndex],
-      status: status || cachedReports[reportIndex].status,
-      audited: status === "Audited & Verified",
-      updatedDate: "Today",
-    };
-
-    res.status(200).json({
+    return res.status(200).json({
       message: "Report updated successfully",
-      report: cachedReports[reportIndex],
+      report: {
+        id: report._id.toString(),
+        title: report.title,
+        type: report.type,
+        period: report.period,
+        updatedDate: "Today",
+        fileSize: report.fileSize,
+        status: report.status,
+        description: report.description,
+        audited: report.audited,
+      },
     });
   } catch (error) {
-    res.status(500).json({ message: "Failed to update report", error: error.message });
+    return res.status(500).json({
+      message: "Failed to update report",
+      error: error.message,
+    });
   }
 };
+
+
 
 /**
  * Delete Management Report (CRUD Delete)
@@ -486,46 +543,40 @@ const updateManagementReport = async (req, res) => {
 const deleteManagementReport = async (req, res) => {
   try {
     const { id } = req.params;
-    const initialLen = cachedReports.length;
-    cachedReports = cachedReports.filter((r) => r.id !== id);
 
-    if (cachedReports.length === initialLen) {
-      return res.status(404).json({ message: "Report not found." });
+    const report = await ManagementReport.findByIdAndDelete(id);
+
+    if (!report) {
+      return res.status(404).json({
+        message: "Report not found.",
+      });
     }
 
-    res.status(200).json({ message: "Report deleted successfully" });
+    return res.status(200).json({
+      message: "Report deleted successfully",
+    });
   } catch (error) {
-    res.status(500).json({ message: "Failed to delete report", error: error.message });
+    return res.status(500).json({
+      message: "Failed to delete report",
+      error: error.message,
+    });
   }
 };
-
-// ---------------------------------------------------------------------------
-// Library Staff account management (University Management only).
-// Management can list and create library_staff accounts - never students,
-// academic staff, or other management users.
-// ---------------------------------------------------------------------------
-const UserAccount = require("../models/UserAccount");
-const {
-  hashPassword,
-  passwordPolicyError,
-  generateTemporaryPassword,
-} = require("./authController");
-
-/**
- * GET /api/management/library-staff
- * Safe projection only - passwordHash is never selected (schema select:false).
- */
 const listLibraryStaff = async (req, res) => {
   try {
-    const staff = await UserAccount.find({ role: "library_staff" }).sort({ createdAt: -1 });
+    const staff = await UserAccount.find({
+      role: "library_staff",
+    }).sort({ createdAt: -1 });
+
     return res.status(200).json({
       staff: staff.map((account) => account.toSafeObject()),
     });
   } catch (error) {
-    return res.status(500).json({ message: "Failed to load library staff accounts." });
+    return res.status(500).json({
+      message: "Failed to load library staff accounts.",
+    });
   }
 };
-
 /**
  * POST /api/management/library-staff
  * Creates one active library_staff account with a hashed temporary password
